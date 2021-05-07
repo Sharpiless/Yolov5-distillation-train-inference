@@ -22,6 +22,12 @@ python train_distill.py --weights yolov5s.pt \
 
 > --distill-ratio：蒸馏损失权重
 
+# 准备数据集：
+
+默认会启用 data/voc.yaml 自动下载VOC数据集进行训练
+
+如需修改成自己的数据集，则只需要修改yaml路径即可
+
 # 实验结果：
 
 数据集：
@@ -56,8 +62,8 @@ Teacher model：Yolov5l（mAP 0.5:0.95 = 0.541）
 - [√] 完善代码结构和相关参数设定
 - [×] 查找为何蒸馏损失不起作用
 - [×] 完善相关实验并测试精度
-- [×] 修改dataloader加快训练速度
-- [×] 修改teacher model的推理加快训练速度
+- [√] 修改dataloader加快训练速度
+- [×] 修改teacher model的批量推理加快训练速度
 
 # 我的公众号：
 

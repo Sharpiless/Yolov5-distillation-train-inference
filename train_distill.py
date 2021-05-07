@@ -26,8 +26,9 @@ from models.experimental import attempt_load
 from models.yolo import Model
 from utils.autoanchor import check_anchors
 from utils.datasets_still import create_dataloader
-from utils.general import labels_to_class_weights, increment_path, labels_to_image_weights, init_seeds, \
-    fitness, strip_optimizer, get_latest_run, check_dataset, check_file, check_git_status, check_img_size, \
+from utils.general import increment_path, init_seeds, \
+    fitness, strip_optimizer, get_latest_run, check_dataset, \
+    check_file, check_git_status, check_img_size, \
     check_requirements, print_mutation, set_logging, one_cycle, colorstr
 from utils.google_utils import attempt_download
 from utils.loss import ComputeLoss, ComputeDstillLoss
@@ -152,10 +153,10 @@ def train(hyp, opt, device, tb_writer=None):
     optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
     logger.info('Optimizer groups: %g .bias, %g conv.weight, %g other' %
                 (len(pg2), len(pg1), len(pg0)))
-    del pg0, pg1, pg2
+    del pg0 
+    del pg1 
+    del pg2
 
-    # Scheduler https://arxiv.org/pdf/1812.01187.pdf
-    # https://pytorch.org/docs/stable/_modules/torch/optim/lr_scheduler.html#OneCycleLR
     if opt.linear_lr:
         def lf(x): return (1 - x / (epochs - 1)) * \
             (1.0 - hyp['lrf']) + hyp['lrf']  # linear
@@ -195,7 +196,8 @@ def train(hyp, opt, device, tb_writer=None):
                         (weights, ckpt['epoch'], epochs))
             epochs += ckpt['epoch']  # finetune additional epochs
 
-        del ckpt, state_dict
+        del ckpt
+        del state_dict
 
     # Image sizes
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
@@ -274,8 +276,6 @@ def train(hyp, opt, device, tb_writer=None):
     for epoch in range(start_epoch, epochs):
         model.train()
 
-        # b = int(random.uniform(0.25 * imgsz, 0.75 * imgsz + gs) // gs * gs)
-        # dataset.mosaic_border = [b - imgsz, -b]  # height, width borders
         mloss = torch.zeros(4 + 1, device=device)  # mean losses
         if rank != -1:
             dataloader.sampler.set_epoch(epoch)
@@ -285,7 +285,6 @@ def train(hyp, opt, device, tb_writer=None):
         if rank in [-1, 0]:
             pbar = tqdm(pbar, total=nb)  # progress bar
         optimizer.zero_grad()
-        # batch -------------------------------------------------------------
         for i, (imgs, paths, _) in pbar:
             # number integrated batches (since train start)
             ni = i + nb * epoch
