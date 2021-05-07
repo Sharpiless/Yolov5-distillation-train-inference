@@ -8,7 +8,10 @@ https://github.com/Sharpiless/Yolov5-distillation-train-inference
 # 蒸馏训练：
 
 ```bash
-python train_distill.py
+python train_distill.py --weights yolov5s.pt \
+    --teacher weights/yolov5l_voc.pt --distill-ratio 0.001 \
+    -- teacher-cfg model/yolov5l.yaml --data data/voc.yaml \
+    --epochs 30 --batch-size 16
 ```
 
 # 训练参数:
@@ -25,7 +28,7 @@ python train_distill.py
 
 VOC2007（补充的无标签数据使用VOC2012）
 
-GPU：Tesla T4*1
+GPU：2080Ti*1
 
 Batch Size：16
 
@@ -50,7 +53,7 @@ Teacher model：Yolov5l（mAP 0.5:0.95 = 0.541）
 # 待做事项：
 
 - [√] 修改logist输出作为蒸馏损失输入
-- [x] 查找为何蒸馏损失权重不起作用
+- [×] 查找为何蒸馏损失权重不起作用
 - [×] 完善相关实验并测试精度
 
 # 我的公众号：
