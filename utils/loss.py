@@ -241,12 +241,12 @@ class ComputeLoss:
 
 class ComputeDstillLoss:
     # Compute losses
-    def __init__(self, model, autobalance=False, distill_ratio=0.5):
+    def __init__(self, model, autobalance=False, distill_ratio=0.5, temperature=10):
         super(ComputeDstillLoss, self).__init__()
         device = next(model.parameters()).device  # get model device
         h = model.hyp  # hyperparameters
         self.distill_ratio = distill_ratio
-        self.T = 1
+        self.T = temperature
         # Define criteria
         BCEcls = nn.BCEWithLogitsLoss(
             pos_weight=torch.tensor([h['cls_pw']], device=device))
@@ -282,7 +282,7 @@ class ComputeDstillLoss:
 
         return self.T**2 * soft_label_loss
 
-    def __call__(self, p, targets):  # predictions, targets, model
+    def __call__(self, p, targets, soft_loss=False, without_cls_loss=False):  # predictions, targets, model
         device = targets.device
         lcls, lbox, lobj, ldistill = torch.zeros(1, device=device), torch.zeros(
             1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device)
@@ -320,7 +320,10 @@ class ComputeDstillLoss:
                     td = torch.full_like(
                         tlogits[i], self.cn, device=device)  # targets
                     td[range(n)] = tlogits[i]
-                    ldistill += self.L2Logits(ps[:, 5:], td)
+                    if soft_loss:
+                        ldistill += self.soft_logits_loss(ps[:, 5:], td)
+                    else:
+                        ldistill += self.L2Logits(ps[:, 5:], td)
                     # 这里怎么换成logits
 
             obji = self.BCEobj(pi[..., 4], tobj)
@@ -336,9 +339,10 @@ class ComputeDstillLoss:
         lcls *= self.hyp['cls']
         ldistill *= self.distill_ratio
         bs = tobj.shape[0]  # batch size
-
-        loss = lbox + lobj + lcls + ldistill
-        # loss = lbox + lobj + ldistill
+        if without_cls_loss:
+            loss = lbox + lobj + ldistill
+        else:
+            loss = lbox + lobj + lcls + ldistill
         return loss * bs, torch.cat((lbox, lobj, lcls, loss, ldistill)).detach()
 
     def build_targets(self, p, targets):
