@@ -110,6 +110,7 @@ def train(hyp, opt, device, tb_writer=None):
     test_path = data_dict['val']
 
     # Teacher Model
+    assert os.path.exists(opt.teacher), '-[ERROR] tearcher weights do not exists.'
     teacher_model = TeacherModel()
     teacher_model.init_model(opt.teacher, opt.device, 1, nc, opt.teacher_cfg)
 
@@ -310,12 +311,12 @@ def train(hyp, opt, device, tb_writer=None):
             dataloader.sampler.set_epoch(epoch)
         pbar = enumerate(dataloader)
         logger.info(('\n' + '%10s' * 9) % ('Epoch', 'gpu_mem', 'box',
-                                           'obj', 'cls', 'distill', 'total', 'labels', 'img_size'))
+                                           'obj', 'cls', 'distill', 'total', 'teacher-preds', 'img_size'))
         if rank in [-1, 0]:
             pbar = tqdm(pbar, total=nb)  # progress bar
         optimizer.zero_grad()
         # batch -------------------------------------------------------------
-        for i, (imgs, targets, paths, _) in pbar:
+        for i, (imgs, _, paths, _) in pbar:
             # number integrated batches (since train start)
             ni = i + nb * epoch
             imgs = imgs.to(device, non_blocking=True).float() / \
@@ -338,14 +339,9 @@ def train(hyp, opt, device, tb_writer=None):
             # Forward
             with amp.autocast(enabled=cuda):
                 pred = model(imgs)  # forward
-                # targets.shape = (16, 6)
-                # [batch_id, class_id, x, y, w, h]
                 t_targets = teacher_model.generate_targets(imgs, opt.img_size)
-                # targets.shape = (16, 6 + n_classes)
-                # [batch_id, class_id, x, y, w, h, [...logits]]
                 loss, loss_items = compute_distill_loss(
                     pred, t_targets.to(device))
-                # loss, loss_items = compute_loss(pred, targets.to(device))
                 if rank != -1:
                     loss *= opt.world_size  # gradient averaged between devices in DDP mode
                 if opt.quad:
@@ -369,20 +365,8 @@ def train(hyp, opt, device, tb_writer=None):
                 mem = '%.3gG' % (torch.cuda.memory_reserved(
                 ) / 1E9 if torch.cuda.is_available() else 0)  # (GB)
                 s = ('%10s' * 2 + '%10.4g' * 7) % (
-                    '%g/%g' % (epoch, epochs - 1), mem, *mloss, targets.shape[0], imgs.shape[-1])
+                    '%g/%g' % (epoch, epochs - 1), mem, *mloss, t_targets.shape[0], imgs.shape[-1])
                 pbar.set_description(s)
-
-                # Plot
-                if plots and ni < 3:
-                    f = save_dir / f'train_batch{ni}.jpg'  # filename
-                    Thread(target=plot_images, args=(
-                        imgs, targets, paths, f), daemon=True).start()
-                    # if tb_writer:
-                    #     tb_writer.add_image(f, result, dataformats='HWC', global_step=epoch)
-                    #     tb_writer.add_graph(torch.jit.trace(model, imgs, strict=False), [])  # add model graph
-                elif plots and ni == 10 and wandb_logger.wandb:
-                    wandb_logger.log({"Mosaics": [wandb_logger.wandb.Image(str(x), caption=x.name) for x in
-                                                  save_dir.glob('train*.jpg') if x.exists()]})
 
             # end batch ------------------------------------------------------------------------------------------------
         # end epoch ----------------------------------------------------------------------------------------------------
