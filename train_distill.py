@@ -230,7 +230,6 @@ def train(hyp, opt, device, tb_writer=None):
                                        pad=0.5, prefix=colorstr('val: '))[0]
 
         if not opt.resume:
-
             # Anchors
             if not opt.noautoanchor:
                 check_anchors(dataset, model=model,
