@@ -110,7 +110,7 @@ class Detector(object):
                             line.extend(xywh)
                             line.extend(logits)
                             targets.append(line)
-        return torch.tensor(np.array(targets))
+        return torch.tensor(np.array(targets), dtyp)
 
 
 if __name__ == '__main__':

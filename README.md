@@ -9,7 +9,7 @@ https://github.com/Sharpiless/Yolov5-distillation-train-inference
 
 ```bash
 python train_distill.py --weights yolov5s.pt \
-    --teacher weights/yolov5l_voc.pt --distill-ratio 0.001 \
+    --teacher weights/yolov5l_voc.pt --distill_ratio 0.001 \
     -- teacher-cfg model/yolov5l.yaml --data data/voc.yaml \
     --epochs 30 --batch-size 16
 ```

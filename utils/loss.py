@@ -1,5 +1,6 @@
 # Loss functions
 
+from torch.nn.functional import softmax, cross_entropy
 import torch
 import torch.nn as nn
 
@@ -245,6 +246,7 @@ class ComputeDstillLoss:
         device = next(model.parameters()).device  # get model device
         h = model.hyp  # hyperparameters
         self.distill_ratio = distill_ratio
+        self.T = 1
         # Define criteria
         BCEcls = nn.BCEWithLogitsLoss(
             pos_weight=torch.tensor([h['cls_pw']], device=device))
@@ -271,6 +273,14 @@ class ComputeDstillLoss:
         self.L2Logits = L2Logitsobj
         for k in 'na', 'nc', 'nl', 'anchors':
             setattr(self, k, getattr(det, k))
+
+    def soft_logits_loss(self, student_var, teacher_var):
+
+        student_var = softmax(student_var / self.T)
+        teacher_var = softmax(teacher_var / self.T)
+        soft_label_loss = torch.mean(cross_entropy(student_var, teacher_var))
+
+        return self.T**2 * soft_label_loss
 
     def __call__(self, p, targets):  # predictions, targets, model
         device = targets.device
@@ -310,7 +320,7 @@ class ComputeDstillLoss:
                     td = torch.full_like(
                         tlogits[i], self.cn, device=device)  # targets
                     td[range(n)] = tlogits[i]
-                    ldistill += self.L2Logits(ps[:, 5:], td) 
+                    ldistill += self.L2Logits(ps[:, 5:], td)
                     # 这里怎么换成logits
 
             obji = self.BCEobj(pi[..., 4], tobj)
