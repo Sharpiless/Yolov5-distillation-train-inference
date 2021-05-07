@@ -25,7 +25,7 @@ import test  # import test.py to get mAP after each epoch
 from models.experimental import attempt_load
 from models.yolo import Model
 from utils.autoanchor import check_anchors
-from utils.datasets import create_dataloader
+from utils.datasets_still import create_dataloader
 from utils.general import labels_to_class_weights, increment_path, labels_to_image_weights, init_seeds, \
     fitness, strip_optimizer, get_latest_run, check_dataset, check_file, check_git_status, check_img_size, \
     check_requirements, print_mutation, set_logging, one_cycle, colorstr
@@ -218,10 +218,7 @@ def train(hyp, opt, device, tb_writer=None):
                                             hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
                                             world_size=opt.world_size, workers=opt.workers,
                                             image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
-    mlc = np.concatenate(dataset.labels, 0)[:, 0].max()  # max label class
     nb = len(dataloader)  # number of batches
-    assert mlc < nc, 'Label class %g exceeds nc=%g in %s. Possible class labels are 0-%g' % (
-        mlc, nc, opt.data, nc - 1)
 
     # Process 0
     if rank in [-1, 0]:
@@ -231,14 +228,6 @@ def train(hyp, opt, device, tb_writer=None):
                                        pad=0.5, prefix=colorstr('val: '))[0]
 
         if not opt.resume:
-            labels = np.concatenate(dataset.labels, 0)
-            c = torch.tensor(labels[:, 0])  # classes
-            # cf = torch.bincount(c.long(), minlength=nc) + 1.  # frequency
-            # model._initialize_biases(cf.to(device))
-            if plots:
-                plot_labels(labels, names, save_dir, loggers)
-                if tb_writer:
-                    tb_writer.add_histogram('classes', c, 0)
 
             # Anchors
             if not opt.noautoanchor:
@@ -261,8 +250,7 @@ def train(hyp, opt, device, tb_writer=None):
     model.nc = nc  # attach number of classes to model
     model.hyp = hyp  # attach hyperparameters to model
     model.gr = 1.0  # iou loss ratio (obj_loss = 1.0 or iou)
-    model.class_weights = labels_to_class_weights(
-        dataset.labels, nc).to(device) * nc  # attach class weights
+    model.class_weights = 1.0
     model.names = names
 
     # Start training
@@ -286,24 +274,6 @@ def train(hyp, opt, device, tb_writer=None):
     for epoch in range(start_epoch, epochs):
         model.train()
 
-        # Update image weights (optional)
-        if opt.image_weights:
-            # Generate indices
-            if rank in [-1, 0]:
-                cw = model.class_weights.cpu().numpy() * (1 - maps) ** 2 / nc  # class weights
-                iw = labels_to_image_weights(
-                    dataset.labels, nc=nc, class_weights=cw)  # image weights
-                dataset.indices = random.choices(
-                    range(dataset.n), weights=iw, k=dataset.n)  # rand weighted idx
-            # Broadcast if DDP
-            if rank != -1:
-                indices = (torch.tensor(dataset.indices) if rank ==
-                           0 else torch.zeros(dataset.n)).int()
-                dist.broadcast(indices, 0)
-                if rank != 0:
-                    dataset.indices = indices.cpu().numpy()
-
-        # Update mosaic border
         # b = int(random.uniform(0.25 * imgsz, 0.75 * imgsz + gs) // gs * gs)
         # dataset.mosaic_border = [b - imgsz, -b]  # height, width borders
         mloss = torch.zeros(4 + 1, device=device)  # mean losses
@@ -316,7 +286,7 @@ def train(hyp, opt, device, tb_writer=None):
             pbar = tqdm(pbar, total=nb)  # progress bar
         optimizer.zero_grad()
         # batch -------------------------------------------------------------
-        for i, (imgs, _, paths, _) in pbar:
+        for i, (imgs, paths, _) in pbar:
             # number integrated batches (since train start)
             ni = i + nb * epoch
             imgs = imgs.to(device, non_blocking=True).float() / \
@@ -523,7 +493,7 @@ if __name__ == '__main__':
                         help='only save final checkpoint')
     parser.add_argument('--notest', action='store_true',
                         help='only test final epoch')
-    parser.add_argument('--noautoanchor', action='store_true',
+    parser.add_argument('--noautoanchor', default=True,
                         help='disable autoanchor check')
     parser.add_argument('--evolve', action='store_true',
                         help='evolve hyperparameters')

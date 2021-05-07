@@ -324,7 +324,6 @@ class ComputeDstillLoss:
                         ldistill += self.soft_logits_loss(ps[:, 5:], td)
                     else:
                         ldistill += self.L2Logits(ps[:, 5:], td)
-                    # 这里怎么换成logits
 
             obji = self.BCEobj(pi[..., 4], tobj)
             lobj += obji * self.balance[i]  # obj loss
