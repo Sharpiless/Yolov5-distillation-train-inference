@@ -47,6 +47,12 @@ Teacher model：Yolov5l（mAP 0.5:0.95 = 0.541）
 
 参数和细节正在完善
 
+# 待做事项：
+
+- [√] 修改logist输出作为蒸馏损失输入
+- [x] 查找为何蒸馏损失权重不起作用
+- [×] 完善相关实验并测试精度
+
 # 我的公众号：
 
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/20210310070958646.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3dlaXhpbl80NDkzNjg4OQ==,size_16,color_FFFFFF,t_70)
