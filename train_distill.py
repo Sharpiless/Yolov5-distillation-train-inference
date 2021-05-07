@@ -34,13 +34,11 @@ from utils.loss import ComputeLoss, ComputeDstillLoss
 from utils.plots import plot_images, plot_labels, plot_results, plot_evolution
 from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_distributed_zero_first, is_parallel
 from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
-from detector import Detector
+from teacher import TeacherModel
 logger = logging.getLogger(__name__)
 
 
 def train(hyp, opt, device, tb_writer=None):
-
-    teacher_model = Detector(opt.teacher, opt.img_size[0])
 
     logger.info(colorstr('hyperparameters: ') +
                 ', '.join(f'{k}={v}' for k, v in hyp.items()))
@@ -110,6 +108,10 @@ def train(hyp, opt, device, tb_writer=None):
         check_dataset(data_dict)  # check
     train_path = data_dict['train']
     test_path = data_dict['val']
+
+    # Teacher Model
+    teacher_model = TeacherModel()
+    teacher_model.init_model(opt.teacher, opt.device, 1, nc, opt.teacher_cfg)
 
     # Freeze
     freeze = []  # parameter names to freeze (full or partial)
@@ -476,7 +478,7 @@ def train(hyp, opt, device, tb_writer=None):
                 results, _, _ = test.test(opt.data,
                                           batch_size=batch_size * 2,
                                           imgsz=imgsz_test,
-                                          conf_thres=0.001,
+                                          conf_thres=0.0001,
                                           iou_thres=0.7,
                                           model=attempt_load(m, device).half(),
                                           single_cls=opt.single_cls,
@@ -507,11 +509,11 @@ def train(hyp, opt, device, tb_writer=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', type=str,
-                        default='yolov5s.pt', help='initial weights path')
+                        default='weights/yolov5s.pt', help='initial weights path')
     parser.add_argument('--teacher', type=str,
                         default='weights/yolov5l.pt', help='teacher weights path')
     parser.add_argument('--distill-ratio', type=float,
-                        default=0.05, help='distill loss ratio in total loss')
+                        default=0.001, help='distill loss ratio in total loss')
     parser.add_argument('--cfg', type=str,
                         default='models/yolov5s.yaml', help='model.yaml path')
     parser.add_argument('--teacher-cfg', type=str,

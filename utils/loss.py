@@ -310,7 +310,7 @@ class ComputeDstillLoss:
                     td = torch.full_like(
                         tlogits[i], self.cn, device=device)  # targets
                     td[range(n)] = tlogits[i]
-                    ldistill += self.L2Logits(ps[:, 5:].sigmoid(), td) 
+                    ldistill += self.L2Logits(ps[:, 5:], td) 
                     # 这里怎么换成logits
 
             obji = self.BCEobj(pi[..., 4], tobj)

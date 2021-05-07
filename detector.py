@@ -93,7 +93,6 @@ class Detector(object):
                 pred = non_max_suppression(
                     pred, self.conf_thres, self.iou_thres, classes=None, agnostic=False)
 
-                bboxes = []
                 for i, det in enumerate(pred):  # detections per image
 
                     gn = torch.tensor(tar_size)[[1, 0, 1, 0]]
