@@ -52,9 +52,8 @@ class Detect(nn.Module):
                     self.grid[i] = self._make_grid(nx, ny).to(x[i].device)
 
                 y = torch.full_like(x[i], 0.0, device=x[i].device)
-                y[..., :5] = x[..., :5].sigmoid()
-                y[..., 5:] = x[i][5:]
-                raise
+                y[..., :5] = x[i][..., :5].sigmoid()
+                y[..., 5:] = x[i][..., 5:]
                 if self.inplace:
                     y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + self.grid[i]) * self.stride[i]  # xy
                     y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i]  # wh

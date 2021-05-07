@@ -30,6 +30,7 @@ class Detector(object):
 
     def _init_model(self):
         self.model = attempt_load(self.weights, map_location=self.device)
+        self.model.eval()
         self.stride = int(self.model.stride.max())  # model stride
         self.imgsz = check_img_size(
             self.imgsz, s=self.stride)  # check img_size

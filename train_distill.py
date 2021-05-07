@@ -514,6 +514,8 @@ if __name__ == '__main__':
                         default=0.05, help='distill loss ratio in total loss')
     parser.add_argument('--cfg', type=str,
                         default='models/yolov5s.yaml', help='model.yaml path')
+    parser.add_argument('--teacher-cfg', type=str,
+                        default='models/yolov5l.yaml', help='teacher model.yaml path')
     parser.add_argument('--data', type=str,
                         default='data/voc.yaml', help='data.yaml path')
     parser.add_argument(
