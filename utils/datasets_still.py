@@ -262,6 +262,7 @@ class LoadWebcam:  # for inference
     def __len__(self):
         return 0
 
+
 def img2label_paths(img_paths):
     # Define label paths as a function of image paths
     sa, sb = os.sep + 'images' + os.sep, os.sep + \
@@ -314,8 +315,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.label_files = img2label_paths(self.img_files)  # labels
         if cache_path.is_file():
             cache, exists = torch.load(cache_path), True  # load
-            if cache['hash'] != get_hash(self.label_files + self.img_files) or 'version' not in cache:  # changed
-                cache, exists = self.cache_labels(cache_path, prefix), False  # re-cache
+            # changed
+            if cache['hash'] != get_hash(self.label_files + self.img_files) or 'version' not in cache:
+                cache, exists = self.cache_labels(
+                    cache_path, prefix), False  # re-cache
         else:
             raise EOFError('-[ERROR] test dataloader must be created first.')
 
@@ -379,6 +382,76 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 gb += self.imgs[i].nbytes
                 pbar.desc = f'{prefix}Caching images ({gb / 1E9:.1f}GB)'
             pbar.close()
+
+    def cache_labels(self, path=Path('./labels.cache'), prefix=''):
+        # Cache dataset labels, check images and read shapes
+        x = {}  # dict
+        nm, nf, ne, nc = 0, 0, 0, 0  # number missing, found, empty, duplicate
+        pbar = tqdm(zip(self.img_files, self.label_files),
+                    desc='Scanning images', total=len(self.img_files))
+        for i, (im_file, lb_file) in enumerate(pbar):
+            try:
+                # verify images
+                im = Image.open(im_file)
+                im.verify()  # PIL verify
+                shape = exif_size(im)  # image size
+                segments = []  # instance segments
+                assert (shape[0] > 9) & (
+                    shape[1] > 9), f'image size {shape} <10 pixels'
+                assert im.format.lower(
+                ) in img_formats, f'invalid image format {im.format}'
+
+                # verify labels
+                if os.path.isfile(lb_file):
+                    nf += 1  # label found
+                    with open(lb_file, 'r') as f:
+                        l = [x.split() for x in f.read().strip().splitlines()]
+                        if any([len(x) > 8 for x in l]):  # is segment
+                            classes = np.array([x[0]
+                                               for x in l], dtype=np.float32)
+                            # (cls, xy1...)
+                            segments = [
+                                np.array(x[1:], dtype=np.float32).reshape(-1, 2) for x in l]
+                            l = np.concatenate(
+                                (classes.reshape(-1, 1), segments2boxes(segments)), 1)  # (cls, xywh)
+                        l = np.array(l, dtype=np.float32)
+                    if len(l):
+                        assert l.shape[1] == 5, 'labels require 5 columns each'
+                        assert (l >= 0).all(), 'negative labels'
+                        assert (l[:, 1:] <= 1).all(
+                        ), 'non-normalized or out of bounds coordinate labels'
+                        assert np.unique(
+                            l, axis=0).shape[0] == l.shape[0], 'duplicate labels'
+                    else:
+                        ne += 1  # label empty
+                        l = np.zeros((0, 5), dtype=np.float32)
+                else:
+                    nm += 1  # label missing
+                    l = np.zeros((0, 5), dtype=np.float32)
+                x[im_file] = [l, shape, segments]
+            except Exception as e:
+                nc += 1
+                print(
+                    f'{prefix}WARNING: Ignoring corrupted image and/or label {im_file}: {e}')
+
+            pbar.desc = f"{prefix}Scanning '{path.parent / path.stem}' images and labels... " \
+                        f"{nf} found, {nm} missing, {ne} empty, {nc} corrupted"
+        pbar.close()
+
+        if nf == 0:
+            print(f'{prefix}WARNING: No labels found in {path}. See {help_url}')
+
+        x['hash'] = get_hash(self.label_files + self.img_files)
+        x['results'] = nf, nm, ne, nc, i + 1
+        x['version'] = 0.1  # cache version
+        try:
+            torch.save(x, path)  # save for next time
+            logging.info(f'{prefix}New cache created: {path}')
+        except Exception as e:
+            # path not writeable
+            logging.info(
+                f'{prefix}WARNING: Cache directory {path.parent} is not writeable: {e}')
+        return x
 
     def cache_images(self, path=Path('./labels.cache'), prefix=''):
         # Cache dataset labels, check images and read shapes
@@ -604,6 +677,7 @@ def load_mosaic(self, index):
                               border=self.mosaic_border)  # border to remove
 
     return img4
+
 
 def replicate(img, labels):
     # Replicate labels
