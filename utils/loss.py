@@ -328,7 +328,7 @@ class ComputeDstillLoss:
                     td[range(n)] = tlogits[i]
                     if soft_loss:
                         # ldistill += self.kl_distill_loss(ps[:, 5:], td)
-                        ldistill += self.SigmoidCrossEntry(ps[:, 5:], td)
+                        ldistill += self.SigmoidCrossEntry(ps[:, 5:], td.sigmoid())
                     else:
                         ldistill += self.L2Logits(ps[:, 5:].sigmoid(), td.sigmoid())
 
