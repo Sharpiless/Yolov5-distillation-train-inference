@@ -252,7 +252,7 @@ class ComputeDstillLoss:
             pos_weight=torch.tensor([h['cls_pw']], device=device))
         BCEobj = nn.BCEWithLogitsLoss(
             pos_weight=torch.tensor([h['obj_pw']], device=device))
-        L2Logitsobj = nn.MSELoss()
+        self.L2Logits = nn.MSELoss()
         self.CrossEntropyLoss = torch.nn.CrossEntropyLoss()
         # Class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
         # positive, negative BCE targets
@@ -270,7 +270,7 @@ class ComputeDstillLoss:
         self.ssi = list(det.stride).index(
             16) if autobalance else 0  # stride 16 index
         self.BCEcls, self.BCEobj, self.gr, self.hyp, self.autobalance = BCEcls, BCEobj, model.gr, h, autobalance
-        self.L2Logits = L2Logitsobj
+        self.SigmoidCrossEntry = torch.nn.BCELoss()
         for k in 'na', 'nc', 'nl', 'anchors':
             setattr(self, k, getattr(det, k))
 
@@ -322,15 +322,15 @@ class ComputeDstillLoss:
                     t = torch.full_like(
                         ps[:, 5:], self.cn, device=device)  # targets
                     t[range(n), tcls[i]] = self.cp
-                    lcls += self.BCEcls(ps[:, 5:].sigmoid(), t)  # BCE
+                    lcls += self.BCEcls(ps[:, 5:], t)  # BCE
                     td = torch.full_like(
                         tlogits[i], self.cn, device=device)  # targets
                     td[range(n)] = tlogits[i]
                     if soft_loss:
                         # ldistill += self.kl_distill_loss(ps[:, 5:], td)
-                        ldistill += self.BCEcls(ps[:, 5:].sigmoid(), td.sigmoid())
+                        ldistill += self.SigmoidCrossEntry(ps[:, 5:].sigmoid(), td.sigmoid())
                     else:
-                        ldistill += self.L2Logits(ps[:, 5:], td)
+                        ldistill += self.L2Logits(ps[:, 5:].sigmoid(), td.sigmoid())
 
             obji = self.BCEobj(pi[..., 4], tobj)
             lobj += obji * self.balance[i]  # obj loss
