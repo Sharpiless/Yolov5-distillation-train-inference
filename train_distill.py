@@ -112,7 +112,7 @@ def train(hyp, opt, device, tb_writer=None):
 
     # Teacher Model
     assert os.path.exists(opt.teacher), '-[ERROR] tearcher weights do not exists.'
-    teacher_model = TeacherModel(conf_thres=opt.t_conf_thres)
+    teacher_model = TeacherModel(conf_thres=opt.t_conf_thres, iou_thres=opt.t_nms_thres)
     teacher_model.init_model(opt.teacher, opt.device, 1, nc, opt.teacher_cfg)
 
     # Freeze
@@ -471,7 +471,9 @@ if __name__ == '__main__':
     parser.add_argument('--distill-ratio', type=float,
                         default=0.001, help='distill loss ratio in total loss')
     parser.add_argument('--t_conf_thres', type=float,
-                        default=0.1, help='temperature in soft softmax distillation loss')
+                        default=0.1, help='teacher confidence threshold')
+    parser.add_argument('--t_nms_thres', type=float,
+                        default=0.3, help='teacher nms iou threshold')
     parser.add_argument('--temperature', type=float,
                         default=10.0, help='temperature in soft softmax distillation loss')
     parser.add_argument('--cfg', type=str,
