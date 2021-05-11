@@ -311,7 +311,7 @@ def train(hyp, opt, device, tb_writer=None):
                 pred = model(imgs)  # forward
                 t_targets = teacher_model.generate_targets(imgs, opt.img_size)
                 loss, loss_items = compute_distill_loss(
-                    pred, t_targets.to(device), soft_loss=opt.soft_loss)
+                    pred, t_targets.to(device), opt.soft_loss, opt.without_cls_loss)
                 if rank != -1:
                     loss *= opt.world_size  # gradient averaged between devices in DDP mode
                 if opt.quad:
