@@ -107,6 +107,7 @@ class ComputeLoss:
         g = h['fl_gamma']  # focal loss gamma
         if g > 0:
             BCEcls, BCEobj = FocalLoss(BCEcls, g), FocalLoss(BCEobj, g)
+        self.CrossEntropyLoss = torch.nn.CrossEntropyLoss()
 
         # Detect() module
         det = model.module.model[-1] if is_parallel(model) else model.model[-1]
@@ -253,7 +254,6 @@ class ComputeDstillLoss:
         BCEobj = nn.BCEWithLogitsLoss(
             pos_weight=torch.tensor([h['obj_pw']], device=device))
         L2Logitsobj = nn.MSELoss()
-        self.SoftLossObj = nn.BCELoss()
 
         # Class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
         # positive, negative BCE targets
@@ -283,12 +283,27 @@ class ComputeDstillLoss:
         and student expects the input tensor to be log probabilities! See Issue #2
         """
         T = self.T
-        KD_loss = self.SoftLossObj(F.log_softmax(student_var/T, dim=-1),
-                                F.softmax(teacher_var/T, dim=-1)) * (T * T)
+        KD_loss = nn.KLDivLoss()(F.log_softmax(student_var/T, dim=-1),
+                                 F.softmax(teacher_var/T, dim=-1)) * (T * T)
 
         return KD_loss
 
-    def __call__(self, p, targets, soft_loss=False, without_cls_loss=False):  # predictions, targets, model
+    def soft_label_loss(self, student_var, teacher_var):
+        """
+        Compute the knowledge-distillation (KD) loss given outputs, labels.
+        "Hyperparameters": temperature and alpha
+        NOTE: the KL Divergence for PyTorch comparing the softmaxs of teacher
+        and student expects the input tensor to be log probabilities! See Issue #2
+        """
+        T = self.T
+        student_var = F.softmax(student_var / T)
+        teacher_var = F.softmax(teacher_var / T)
+        soft_label_loss = self.CrossEntropyLoss(student_var, teacher_var)
+
+        return soft_label_loss * T * T
+
+    # predictions, targets, model
+    def __call__(self, p, targets, soft_loss=False, without_cls_loss=False):
         device = targets.device
         lcls, lbox, lobj, ldistill = torch.zeros(1, device=device), torch.zeros(
             1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device)
