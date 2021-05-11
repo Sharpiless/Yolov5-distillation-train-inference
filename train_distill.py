@@ -309,7 +309,7 @@ def train(hyp, opt, device, tb_writer=None):
             # Forward
             with amp.autocast(enabled=cuda):
                 pred = model(imgs)  # forward
-                t_targets = teacher_model.generate_batch_targets(imgs, opt.img_size)
+                t_targets, _ = teacher_model.generate_batch_targets(imgs, opt.img_size)
                 loss, loss_items = compute_distill_loss(
                     pred, t_targets.to(device), opt.soft_loss, opt.without_cls_loss)
                 if rank != -1:

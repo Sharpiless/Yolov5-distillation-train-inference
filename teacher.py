@@ -75,34 +75,6 @@ class TeacherModel(object):
                         int(cls_id), True), line_thickness=2)
         return img0, bboxes
 
-    def generate_targets(self, imgs, tar_size=[640, 640]):
-        targets = []
-        with torch.no_grad():
-            for img_id in range(imgs.shape[0]):
-                img = imgs[img_id].unsqueeze(0)
-                pred = self.model(img)[0]
-                pred = non_max_suppression(
-                    pred, self.conf_thres, self.iou_thres, distill=True, agnostic=False)
-
-                for i, det in enumerate(pred):  # detections per image
-                    gn = torch.tensor(tar_size)[[1, 0, 1, 0]]
-                    if len(det):
-                        # Rescale boxes from img_size to img0 size
-                        det[:, :4] = scale_coords(
-                            img.shape[2:], det[:, :4], tar_size).round()
-
-                        for value in reversed(det):
-                            xyxy, conf, cls_id = value[:4], value[4], value[5]
-                            logits = value[-self.nc:].tolist()
-                            xywh = (xyxy2xywh(torch.tensor(xyxy.cpu()).view(1, 4)
-                                              ) / gn).view(-1).tolist()  # normalized xywh
-                            line = [img_id, int(cls_id)]
-                            line.extend(xywh)
-                            line.extend(logits)
-                            targets.append(line)
-
-        return torch.tensor(np.array(targets), dtype=torch.float32)
-
     def generate_batch_targets(self, imgs, tar_size=[640, 640]):
         targets = []
         preds = self.model(imgs)[0]
@@ -130,7 +102,7 @@ class TeacherModel(object):
                             line.extend(logits)
                             targets.append(line)
 
-        return torch.tensor(np.array(targets), dtype=torch.float32)
+        return torch.tensor(np.array(targets), dtype=torch.float32), preds
 
 
 if __name__ == '__main__':

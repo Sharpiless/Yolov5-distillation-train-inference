@@ -239,6 +239,46 @@ class ComputeLoss:
         return tcls, tbox, indices, anch
 
 
+def compute_distillation_output_loss(p, t_p, model):
+    t_ft = torch.cuda.FloatTensor if t_p[0].is_cuda else torch.Tensor
+    t_lcls, t_lbox, t_lobj = t_ft([0]), t_ft([0]), t_ft([0])
+    h = model.hyp  # hyperparameters
+    red = 'mean'  # Loss reduction (sum or mean)
+    if red != "mean":
+        raise NotImplementedError(
+            "reduction must be mean in distillation mode!")
+
+    DboxLoss = nn.MSELoss(reduction="none")
+    DclsLoss = nn.MSELoss(reduction="none")
+    DobjLoss = nn.MSELoss(reduction="none")
+    # per output
+    for i, pi in enumerate(p):  # layer index, layer predictions
+        t_pi = t_p[i]
+        t_obj_scale = t_pi[..., 4].sigmoid()
+
+        # BBox
+        b_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1, 1, 1, 1, 4)
+        t_lbox += torch.mean(DboxLoss(pi[..., :4],
+                             t_pi[..., :4]) * b_obj_scale)
+
+        # Class
+        if model.nc > 1:  # cls loss (only if multiple classes)
+            c_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1,
+                                                           1, 1, 1, model.nc)
+            # t_lcls += torch.mean(c_obj_scale * (pi[..., 5:] - t_pi[..., 5:]) ** 2)
+            t_lcls += torch.mean(DclsLoss(pi[..., 5:],
+                                 t_pi[..., 5:]) * c_obj_scale)
+
+        # t_lobj += torch.mean(t_obj_scale * (pi[..., 4] - t_pi[..., 4]) ** 2)
+        t_lobj += torch.mean(DobjLoss(pi[..., 4], t_pi[..., 4]) * t_obj_scale)
+    t_lbox *= h['giou'] * h['dist']
+    t_lobj *= h['obj'] * h['dist']
+    t_lcls *= h['cls'] * h['dist']
+    bs = p[0].shape[0]  # batch size
+    loss = (t_lobj + t_lbox + t_lcls) * bs
+    return loss
+
+
 class ComputeDstillLoss:
     # Compute losses
     def __init__(self, model, autobalance=False, distill_ratio=0.5, temperature=10):
