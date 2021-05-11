@@ -282,7 +282,7 @@ def train(hyp, opt, device, tb_writer=None):
             dataloader.sampler.set_epoch(epoch)
         pbar = enumerate(dataloader)
         logger.info(('\n' + '%10s' * 9) % ('Epoch', 'gpu_mem', 'box',
-                                           'obj', 'cls', 'distill', 'total', 'teacher-preds', 'img_size'))
+                                           'obj', 'cls', 'distill', 'total', 'obj_num', 'img_size'))
         if rank in [-1, 0]:
             pbar = tqdm(pbar, total=nb)  # progress bar
         optimizer.zero_grad()

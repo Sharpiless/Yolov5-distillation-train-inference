@@ -70,6 +70,7 @@ class TeacherModel(object):
                     label = f'{lbl} {conf:.2f}'
                     line = [x1, y1, x2, y2, lbl]
                     logits = value[-self.nc:].tolist()
+                    tmp = np.argmax(logits)
                     bboxes.append(line)
                     plot_one_box(xyxy, img0, label=label, color=colors(
                         int(cls_id), True), line_thickness=2)
@@ -140,12 +141,12 @@ if __name__ == '__main__':
 
     teacher = TeacherModel()
 
-    # teacher.init_model('weights/yolov5l.pt', '0', 1, 20, 'models/yolov5l.yaml')
-    # img0 = cv2.imread('data/images/bus.jpg')
-    # img0, bboxes = teacher.predict(img0)
-    # cv2.imshow('winname', img0)
-    # cv2.waitKey(0)
-    teacher.init_model('weights/yolov5l.pt', '0', 2, 20, 'models/yolov5l.yaml')
-    imgs = torch.rand((2, 3, 640, 640)).to(teacher.device)
-    targets = teacher.generate_batch_targets(imgs)
+    teacher.init_model('weights/yolov5l.pt', '0', 1, 20, 'models/yolov5l.yaml')
+    img0 = cv2.imread('data/images/bus.jpg')
+    img0, bboxes = teacher.predict(img0)
+    cv2.imshow('winname', img0)
+    cv2.waitKey(0)
+    # teacher.init_model('weights/yolov5l.pt', '0', 2, 20, 'models/yolov5l.yaml')
+    # imgs = torch.rand((2, 3, 640, 640)).to(teacher.device)
+    # targets = teacher.generate_batch_targets(imgs)
     

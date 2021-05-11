@@ -253,6 +253,7 @@ class ComputeDstillLoss:
         BCEobj = nn.BCEWithLogitsLoss(
             pos_weight=torch.tensor([h['obj_pw']], device=device))
         L2Logitsobj = nn.MSELoss()
+        self.SoftLossObj = nn.BCELoss()
 
         # Class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
         # positive, negative BCE targets
@@ -282,7 +283,7 @@ class ComputeDstillLoss:
         and student expects the input tensor to be log probabilities! See Issue #2
         """
         T = self.T
-        KD_loss = nn.KLDivLoss()(F.log_softmax(student_var/T, dim=-1),
+        KD_loss = self.SoftLossObj(F.log_softmax(student_var/T, dim=-1),
                                 F.softmax(teacher_var/T, dim=-1)) * (T * T)
 
         return KD_loss
