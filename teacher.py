@@ -110,7 +110,7 @@ class TeacherModel(object):
         with torch.no_grad():
             for img_id in range(imgs.shape[0]):
 
-                pred = preds[img_id]                
+                pred = preds[img_id:img_id+1]                
                 pred = non_max_suppression(
                     pred, self.conf_thres, self.iou_thres, distill=True, agnostic=False)
 
@@ -119,7 +119,7 @@ class TeacherModel(object):
                     if len(det):
                         # Rescale boxes from img_size to img0 size
                         det[:, :4] = scale_coords(
-                            img.shape[2:], det[:, :4], tar_size).round()
+                            imgs[img_id].unsqueeze(0).shape[2:], det[:, :4], tar_size).round()
 
                         for value in reversed(det):
                             xyxy, conf, cls_id = value[:4], value[4], value[5]
