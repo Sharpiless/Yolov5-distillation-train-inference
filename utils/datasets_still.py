@@ -334,8 +334,8 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         # Read cache
         cache.pop('hash')  # remove hash
         cache.pop('version')  # remove version
-        shapes = list(cache.values())
-        self.shapes = np.squeeze(np.array(shapes, dtype=np.float64))
+        _, shapes, self.segments = zip(*cache.values())
+        self.shapes = np.array(shapes, dtype=np.float64)
         self.img_files = list(cache.keys())  # update
 
         n = len(shapes)  # number of images
