@@ -287,20 +287,6 @@ class ComputeDstillLoss:
 
         return KD_loss
 
-    def soft_distill_loss(self, student_var, teacher_var):
-        """
-        Compute the knowledge-distillation (KD) loss given outputs, labels.
-        "Hyperparameters": temperature and alpha
-        NOTE: the KL Divergence for PyTorch comparing the softmaxs of teacher
-        and student expects the input tensor to be log probabilities! See Issue #2
-        """
-        T = self.T
-        student_var = F.softmax(student_var / T)
-        teacher_var = F.softmax(teacher_var / T)
-        loss = self.CrossEntropyLoss(student_var, teacher_var)
-
-        return loss * T * T
-
     # predictions, targets, model
     def __call__(self, p, targets, soft_loss=False, without_cls_loss=False):
         device = targets.device
@@ -336,15 +322,15 @@ class ComputeDstillLoss:
                     t = torch.full_like(
                         ps[:, 5:], self.cn, device=device)  # targets
                     t[range(n), tcls[i]] = self.cp
-                    lcls += self.BCEcls(ps[:, 5:], t)  # BCE
+                    lcls += self.BCEcls(ps[:, 5:].sigmoid(), t)  # BCE
                     td = torch.full_like(
                         tlogits[i], self.cn, device=device)  # targets
                     td[range(n)] = tlogits[i]
                     if soft_loss:
-                        ldistill += self.kl_distill_loss(ps[:, 5:], td)
+                        # ldistill += self.kl_distill_loss(ps[:, 5:], td)
+                        ldistill += self.BCEcls(ps[:, 5:].sigmoid(), td.sigmoid())
                     else:
-                        # ldistill += self.L2Logits(ps[:, 5:], td)
-                        ldistill += self.soft_distill_loss(ps[:, 5:], td)
+                        ldistill += self.L2Logits(ps[:, 5:], td)
 
             obji = self.BCEobj(pi[..., 4], tobj)
             lobj += obji * self.balance[i]  # obj loss
@@ -360,7 +346,7 @@ class ComputeDstillLoss:
         ldistill *= self.distill_ratio
         bs = tobj.shape[0]  # batch size
         if without_cls_loss:
-            loss = lbox + lobj + lcls
+            loss = lbox + lobj + ldistill
         else:
             loss = lbox + lobj + lcls + ldistill
         return loss * bs, torch.cat((lbox, lobj, lcls, loss, ldistill)).detach()
