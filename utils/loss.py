@@ -1,6 +1,6 @@
 # Loss functions
 
-from torch.nn.functional import softmax, cross_entropy
+import torch.nn.functional as F
 import torch
 import torch.nn as nn
 
@@ -274,13 +274,18 @@ class ComputeDstillLoss:
         for k in 'na', 'nc', 'nl', 'anchors':
             setattr(self, k, getattr(det, k))
 
-    def soft_logits_loss(self, student_var, teacher_var):
+    def kl_distill_loss(self, student_var, teacher_var):
+        """
+        Compute the knowledge-distillation (KD) loss given outputs, labels.
+        "Hyperparameters": temperature and alpha
+        NOTE: the KL Divergence for PyTorch comparing the softmaxs of teacher
+        and student expects the input tensor to be log probabilities! See Issue #2
+        """
+        T = self.T
+        KD_loss = nn.KLDivLoss()(F.log_softmax(student_var/T, dim=-1),
+                                F.softmax(teacher_var/T, dim=-1)) * (T * T)
 
-        student_var = softmax(student_var / self.T)
-        teacher_var = softmax(teacher_var / self.T)
-        soft_label_loss = torch.mean(cross_entropy(student_var, teacher_var))
-
-        return self.T**2 * soft_label_loss
+        return KD_loss
 
     def __call__(self, p, targets, soft_loss=False, without_cls_loss=False):  # predictions, targets, model
         device = targets.device
@@ -321,7 +326,7 @@ class ComputeDstillLoss:
                         tlogits[i], self.cn, device=device)  # targets
                     td[range(n)] = tlogits[i]
                     if soft_loss:
-                        ldistill += self.soft_logits_loss(ps[:, 5:], td)
+                        ldistill += self.kl_distill_loss(ps[:, 5:], td)
                     else:
                         ldistill += self.L2Logits(ps[:, 5:], td)
 

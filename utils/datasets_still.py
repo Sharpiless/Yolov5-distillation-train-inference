@@ -320,7 +320,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 cache, exists = self.cache_labels(
                     cache_path, prefix), False  # re-cache
         else:
-            raise EOFError('-[ERROR] test dataloader must be created first.')
+            cache, exists = self.cache_labels(cache_path, prefix), False  # cache
 
         # Display cache
         # found, missing, empty, corrupted, total
