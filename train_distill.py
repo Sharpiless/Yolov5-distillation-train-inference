@@ -478,7 +478,6 @@ if __name__ == '__main__':
                         default=0.3, help='teacher nms iou threshold')
     parser.add_argument('--temperature', type=float,
                         default=10.0, help='temperature in soft softmax distillation loss')
-    parser.add_argument('--without_cls_loss', action='store_true', help='do not use sigmoid cross entry loss')
     parser.add_argument('--cfg', type=str,
                         default='models/yolov5s.yaml', help='model.yaml path')
     parser.add_argument('--teacher-cfg', type=str,
