@@ -107,7 +107,6 @@ class ComputeLoss:
         g = h['fl_gamma']  # focal loss gamma
         if g > 0:
             BCEcls, BCEobj = FocalLoss(BCEcls, g), FocalLoss(BCEobj, g)
-        self.CrossEntropyLoss = torch.nn.CrossEntropyLoss()
 
         # Detect() module
         det = model.module.model[-1] if is_parallel(model) else model.model[-1]
@@ -254,7 +253,7 @@ class ComputeDstillLoss:
         BCEobj = nn.BCEWithLogitsLoss(
             pos_weight=torch.tensor([h['obj_pw']], device=device))
         L2Logitsobj = nn.MSELoss()
-
+        self.CrossEntropyLoss = torch.nn.CrossEntropyLoss()
         # Class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
         # positive, negative BCE targets
         self.cp, self.cn = smooth_BCE(eps=h.get('label_smoothing', 0.0))
@@ -288,7 +287,7 @@ class ComputeDstillLoss:
 
         return KD_loss
 
-    def soft_label_loss(self, student_var, teacher_var):
+    def soft_distill_loss(self, student_var, teacher_var):
         """
         Compute the knowledge-distillation (KD) loss given outputs, labels.
         "Hyperparameters": temperature and alpha
@@ -298,9 +297,9 @@ class ComputeDstillLoss:
         T = self.T
         student_var = F.softmax(student_var / T)
         teacher_var = F.softmax(teacher_var / T)
-        soft_label_loss = self.CrossEntropyLoss(student_var, teacher_var)
+        loss = self.CrossEntropyLoss(student_var, teacher_var)
 
-        return soft_label_loss * T * T
+        return loss * T * T
 
     # predictions, targets, model
     def __call__(self, p, targets, soft_loss=False, without_cls_loss=False):
@@ -344,7 +343,8 @@ class ComputeDstillLoss:
                     if soft_loss:
                         ldistill += self.kl_distill_loss(ps[:, 5:], td)
                     else:
-                        ldistill += self.L2Logits(ps[:, 5:], td)
+                        # ldistill += self.L2Logits(ps[:, 5:], td)
+                        ldistill += self.soft_distill_loss(ps[:, 5:], td)
 
             obji = self.BCEobj(pi[..., 4], tobj)
             lobj += obji * self.balance[i]  # obj loss
