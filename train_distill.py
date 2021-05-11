@@ -26,6 +26,7 @@ from models.experimental import attempt_load
 from models.yolo import Model
 from utils.autoanchor import check_anchors
 from utils.datasets import create_dataloader
+from utils.datasets_still import create_dataloader as create_train_dataloader
 from utils.general import increment_path, init_seeds, \
     fitness, strip_optimizer, get_latest_run, check_dataset, \
     check_file, check_git_status, check_img_size, \
@@ -111,8 +112,10 @@ def train(hyp, opt, device, tb_writer=None):
     test_path = data_dict['val']
 
     # Teacher Model
-    assert os.path.exists(opt.teacher), '-[ERROR] tearcher weights do not exists.'
-    teacher_model = TeacherModel(conf_thres=opt.t_conf_thres, iou_thres=opt.t_nms_thres)
+    assert os.path.exists(
+        opt.teacher), '-[ERROR] tearcher weights do not exists.'
+    teacher_model = TeacherModel(
+        conf_thres=opt.t_conf_thres, iou_thres=opt.t_nms_thres)
     teacher_model.init_model(opt.teacher, opt.device, 1, nc, opt.teacher_cfg)
 
     # Freeze
@@ -153,8 +156,8 @@ def train(hyp, opt, device, tb_writer=None):
     optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
     logger.info('Optimizer groups: %g .bias, %g conv.weight, %g other' %
                 (len(pg2), len(pg1), len(pg0)))
-    del pg0 
-    del pg1 
+    del pg0
+    del pg1
     del pg2
 
     if opt.linear_lr:
@@ -214,14 +217,6 @@ def train(hyp, opt, device, tb_writer=None):
     if opt.sync_bn and cuda and rank != -1:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
         logger.info('Using SyncBatchNorm()')
-
-    # Trainloader
-    dataloader, dataset = create_dataloader(train_path, imgsz, batch_size, gs, opt,
-                                            hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
-                                            world_size=opt.world_size, workers=opt.workers,
-                                            image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
-    nb = len(dataloader)  # number of batches
-
     # Process 0
     if rank in [-1, 0]:
         testloader = create_dataloader(test_path, imgsz_test, batch_size * 2, gs, opt,  # testloader
@@ -235,6 +230,13 @@ def train(hyp, opt, device, tb_writer=None):
                 check_anchors(dataset, model=model,
                               thr=hyp['anchor_t'], imgsz=imgsz)
             model.half().float()  # pre-reduce anchor precision
+
+    # Trainloader
+    dataloader, dataset = create_train_dataloader(train_path, imgsz, batch_size, gs, opt,
+                                            hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
+                                            world_size=opt.world_size, workers=opt.workers,
+                                            image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
+    nb = len(dataloader)  # number of batches
 
     # DDP mode
     if cuda and rank != -1:
