@@ -112,7 +112,7 @@ def train(hyp, opt, device, tb_writer=None):
 
     # Teacher Model
     assert os.path.exists(opt.teacher), '-[ERROR] tearcher weights do not exists.'
-    teacher_model = TeacherModel()
+    teacher_model = TeacherModel(conf_thres=opt.t_conf_thres)
     teacher_model.init_model(opt.teacher, opt.device, 1, nc, opt.teacher_cfg)
 
     # Freeze
@@ -266,7 +266,7 @@ def train(hyp, opt, device, tb_writer=None):
     scaler = amp.GradScaler(enabled=cuda)
     compute_loss = ComputeLoss(model)  # init loss class
     compute_distill_loss = ComputeDstillLoss(
-        model, distill_ratio=opt.distill_ratio)
+        model, distill_ratio=opt.distill_ratio, temperature=opt.temperature)
     logger.info(f'Image sizes {imgsz} train, {imgsz_test} test\n'
                 f'Using {dataloader.num_workers} dataloader workers\n'
                 f'Logging results to {save_dir}\n'
@@ -470,6 +470,10 @@ if __name__ == '__main__':
                         help='using soft label distill loss rather than l2 loss')
     parser.add_argument('--distill-ratio', type=float,
                         default=0.001, help='distill loss ratio in total loss')
+    parser.add_argument('--t_conf_thres', type=float,
+                        default=0.1, help='temperature in soft softmax distillation loss')
+    parser.add_argument('--temperature', type=float,
+                        default=10.0, help='temperature in soft softmax distillation loss')
     parser.add_argument('--cfg', type=str,
                         default='models/yolov5s.yaml', help='model.yaml path')
     parser.add_argument('--teacher-cfg', type=str,
