@@ -360,7 +360,7 @@ class ComputeDstillLoss:
         ldistill *= self.distill_ratio
         bs = tobj.shape[0]  # batch size
         if without_cls_loss:
-            loss = lbox + lobj + ldistill
+            loss = lbox + lobj + lcls
         else:
             loss = lbox + lobj + lcls + ldistill
         return loss * bs, torch.cat((lbox, lobj, lcls, loss, ldistill)).detach()
