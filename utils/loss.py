@@ -274,7 +274,7 @@ class ComputeDstillLoss:
         for k in 'na', 'nc', 'nl', 'anchors':
             setattr(self, k, getattr(det, k))
 
-    def kl_distill_loss(self, student_var, teacher_var):
+    def KlSoftmaxLoss(self, student_var, teacher_var):
         """
         Compute the knowledge-distillation (KD) loss given outputs, labels.
         "Hyperparameters": temperature and alpha
@@ -327,7 +327,7 @@ class ComputeDstillLoss:
                         tlogits[i], self.cn, device=device)  # targets
                     td[range(n)] = tlogits[i]
                     if soft_loss:
-                        # ldistill += self.kl_distill_loss(ps[:, 5:], td)
+                        # ldistill += self.KlSoftmaxLoss(ps[:, 5:], td)
                         ldistill += self.SigmoidCrossEntry(ps[:, 5:], td.sigmoid())
                     else:
                         ldistill += self.L2Logits(ps[:, 5:].sigmoid(), td.sigmoid())

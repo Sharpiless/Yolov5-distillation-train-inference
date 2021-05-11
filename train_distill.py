@@ -478,7 +478,7 @@ if __name__ == '__main__':
                         default=0.3, help='teacher nms iou threshold')
     parser.add_argument('--temperature', type=float,
                         default=10.0, help='temperature in soft softmax distillation loss')
-    parser.add_argument('--without_cls_loss', action='store_true', help='do not use KL loss')
+    parser.add_argument('--without_cls_loss', action='store_true', help='do not use sigmoid cross entry loss')
     parser.add_argument('--cfg', type=str,
                         default='models/yolov5s.yaml', help='model.yaml path')
     parser.add_argument('--teacher-cfg', type=str,
@@ -500,7 +500,7 @@ if __name__ == '__main__':
                         help='only save final checkpoint')
     parser.add_argument('--notest', action='store_true',
                         help='only test final epoch')
-    parser.add_argument('--noautoanchor', default=True,
+    parser.add_argument('--noautoanchor', action='store_true',
                         help='disable autoanchor check')
     parser.add_argument('--evolve', action='store_true',
                         help='evolve hyperparameters')

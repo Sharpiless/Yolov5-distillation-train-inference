@@ -10,7 +10,7 @@ https://github.com/Sharpiless/Yolov5-distillation-train-inference
 ```bash
 python train_distill.py --weights yolov5s.pt \
     --teacher weights/yolov5l_voc.pt --distill_ratio 0.001 \
-    -- teacher-cfg model/yolov5l.yaml --data data/voc.yaml \
+    --teacher-cfg model/yolov5l.yaml --data data/voc.yaml \
     --epochs 30 --batch-size 16
 ```
 
@@ -25,6 +25,8 @@ python train_distill.py --weights yolov5s.pt \
 # 准备数据集：
 
 默认会启用 data/voc.yaml 自动下载VOC数据集进行训练
+
+或者手动运行 data/scripts/get_voc2007.sh 下载
 
 如需修改成自己的数据集，则只需要修改yaml路径即可
 
