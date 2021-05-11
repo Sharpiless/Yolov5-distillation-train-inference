@@ -270,7 +270,8 @@ class ComputeDstillLoss:
         self.ssi = list(det.stride).index(
             16) if autobalance else 0  # stride 16 index
         self.BCEcls, self.BCEobj, self.gr, self.hyp, self.autobalance = BCEcls, BCEobj, model.gr, h, autobalance
-        self.SigmoidCrossEntry = torch.nn.BCEWithLogitsLoss()
+        self.SigmoidCrossEntry = torch.nn.BCEWithLogitsLoss(
+            pos_weight=torch.tensor([h['cls_pw']], device=device))
         for k in 'na', 'nc', 'nl', 'anchors':
             setattr(self, k, getattr(det, k))
 
@@ -328,9 +329,11 @@ class ComputeDstillLoss:
                     td[range(n)] = tlogits[i]
                     if soft_loss:
                         # ldistill += self.KlSoftmaxLoss(ps[:, 5:], td)
-                        ldistill += self.SigmoidCrossEntry(ps[:, 5:], td.sigmoid())
+                        ldistill += self.SigmoidCrossEntry(
+                            ps[:, 5:], td.sigmoid())
                     else:
-                        ldistill += self.L2Logits(ps[:, 5:].sigmoid(), td.sigmoid())
+                        ldistill += self.L2Logits(ps[:,
+                                                  5:].sigmoid(), td.sigmoid())
 
             obji = self.BCEobj(pi[..., 4], tobj)
             lobj += obji * self.balance[i]  # obj loss

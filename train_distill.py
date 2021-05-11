@@ -500,7 +500,7 @@ if __name__ == '__main__':
                         help='only save final checkpoint')
     parser.add_argument('--notest', action='store_true',
                         help='only test final epoch')
-    parser.add_argument('--noautoanchor', action='store_true',
+    parser.add_argument('--noautoanchor', default=True,
                         help='disable autoanchor check')
     parser.add_argument('--evolve', action='store_true',
                         help='evolve hyperparameters')
