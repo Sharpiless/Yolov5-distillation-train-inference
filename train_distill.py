@@ -478,8 +478,7 @@ if __name__ == '__main__':
                         default=0.3, help='teacher nms iou threshold')
     parser.add_argument('--temperature', type=float,
                         default=10.0, help='temperature in soft softmax distillation loss')
-    parser.add_argument('--without_cls_loss', type=float,
-                        default=10.0, help='do not use KL loss')
+    parser.add_argument('--without_cls_loss', action='store_true', help='do not use KL loss')
     parser.add_argument('--cfg', type=str,
                         default='models/yolov5s.yaml', help='model.yaml path')
     parser.add_argument('--teacher-cfg', type=str,
@@ -550,7 +549,7 @@ if __name__ == '__main__':
     opt.global_rank = int(os.environ['RANK']) if 'RANK' in os.environ else -1
     set_logging(opt.global_rank)
     if opt.global_rank in [-1, 0]:
-        check_git_status()
+        # check_git_status()
         check_requirements(exclude=('pycocotools', 'thop'))
 
     # Resume
