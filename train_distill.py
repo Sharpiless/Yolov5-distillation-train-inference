@@ -273,6 +273,7 @@ def train(hyp, opt, device, tb_writer=None):
                 f'Using {dataloader.num_workers} dataloader workers\n'
                 f'Logging results to {save_dir}\n'
                 f'Starting training for {epochs} epochs...')
+    Lfile = open('logger.txt', 'w')
     # epoch ------------------------------------------------------------------
     for epoch in range(start_epoch, epochs):
         model.train()
@@ -282,6 +283,8 @@ def train(hyp, opt, device, tb_writer=None):
             dataloader.sampler.set_epoch(epoch)
         pbar = enumerate(dataloader)
         logger.info(('\n' + '%10s' * 9) % ('Epoch', 'gpu_mem', 'box',
+                                           'obj', 'cls', 'distill', 'total', 'obj_num', 'img_size'))
+        Lfile.write(('\n' + '%10s' * 9) % ('Epoch', 'gpu_mem', 'box',
                                            'obj', 'cls', 'distill', 'total', 'obj_num', 'img_size'))
         if rank in [-1, 0]:
             pbar = tqdm(pbar, total=nb)  # progress bar
@@ -339,6 +342,8 @@ def train(hyp, opt, device, tb_writer=None):
                 pbar.set_description(s)
 
             # end batch ------------------------------------------------------------------------------------------------
+        Lfile.write('\n'+('%10s' * 2 + '%10.4g' * 7) % (
+                    '%g/%g' % (epoch, epochs - 1), mem, *mloss, t_targets.shape[0], imgs.shape[-1]))
         # end epoch ----------------------------------------------------------------------------------------------------
 
         # Scheduler
@@ -415,6 +420,7 @@ def train(hyp, opt, device, tb_writer=None):
 
         # end epoch ----------------------------------------------------------------------------------------------------
     # end training
+    Lfile.close()
     if rank in [-1, 0]:
         # Plots
         if plots:
