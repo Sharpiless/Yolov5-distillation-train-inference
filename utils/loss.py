@@ -9,25 +9,27 @@ from utils.torch_utils import is_parallel
 
 # Hyperparameters
 dhyp = {'lr0': 0.01,  # initial learning rate (SGD=1E-2, Adam=1E-3)
-       'momentum': 0.937,  # SGD momentum
-       'weight_decay': 5e-4,  # optimizer weight decay
-       'l1': False,  # smooth l1 loss or iou loss
-       'giou': 0.05,  # giou loss gain
-       'cls': 0.58,  # cls loss gain
-       'cls_pw': 1.0,  # cls BCELoss positive_weight
-       'obj': 1.0,  # obj loss gain (*=img_size/320 if img_size != 320)
-       'obj_pw': 1.0,  # obj BCELoss positive_weight
-       'iou_t': 0.20,  # iou training threshold
-       'anchor_t': 4.0,  # anchor-multiple threshold
-       'fl_gamma': 0.0,  # focal loss gamma (efficientDet default is gamma=1.5)
-       'hsv_h': 0.014,  # image HSV-Hue augmentation (fraction)
-       'hsv_s': 0.68,  # image HSV-Saturation augmentation (fraction)
-       'hsv_v': 0.36,  # image HSV-Value augmentation (fraction)
-       'degrees': 0.0,  # image rotation (+/- deg)
-       'translate': 0.0,  # image translation (+/- fraction)
-       'scale': 0.5,  # image scale (+/- gain)
-       'shear': 0.0,
-       'dist': 1.0}  # image shear (+/- deg)
+        'momentum': 0.937,  # SGD momentum
+        'weight_decay': 5e-4,  # optimizer weight decay
+        'l1': False,  # smooth l1 loss or iou loss
+        'giou': 0.05,  # giou loss gain
+        'cls': 0.58,  # cls loss gain
+        'cls_pw': 1.0,  # cls BCELoss positive_weight
+        'obj': 1.0,  # obj loss gain (*=img_size/320 if img_size != 320)
+        'obj_pw': 1.0,  # obj BCELoss positive_weight
+        'iou_t': 0.20,  # iou training threshold
+        'anchor_t': 4.0,  # anchor-multiple threshold
+        # focal loss gamma (efficientDet default is gamma=1.5)
+        'fl_gamma': 0.0,
+        'hsv_h': 0.014,  # image HSV-Hue augmentation (fraction)
+        'hsv_s': 0.68,  # image HSV-Saturation augmentation (fraction)
+        'hsv_v': 0.36,  # image HSV-Value augmentation (fraction)
+        'degrees': 0.0,  # image rotation (+/- deg)
+        'translate': 0.0,  # image translation (+/- fraction)
+        'scale': 0.5,  # image scale (+/- gain)
+        'shear': 0.0,
+        'dist': 1.0}  # image shear (+/- deg)
+
 
 def smooth_BCE(eps=0.1):  # https://github.com/ultralytics/yolov3/issues/238#issuecomment-598028441
     # return positive, negative label smoothing BCE targets
@@ -143,7 +145,7 @@ class ComputeLoss:
         device = targets.device
         lcls, lbox, lobj = torch.zeros(1, device=device), torch.zeros(
             1, device=device), torch.zeros(1, device=device)  # 三个loss
-        ldistill = torch.zeros(1, device=device)
+        lsoft = torch.zeros(1, device=device)
         tcls, tbox, indices, anchors = self.build_targets(
             p, targets)  # targets
 
@@ -194,7 +196,7 @@ class ComputeLoss:
         bs = tobj.shape[0]  # batch size
 
         loss = lbox + lobj + lcls
-        return loss * bs, torch.cat((lbox, lobj, lcls, ldistill, loss)).detach()
+        return loss * bs, torch.cat((lbox, lobj, lcls, lsoft, loss)).detach()
 
     def build_targets(self, p, targets):
         # Build targets for compute_loss(), input targets(image,class,x,y,w,h)
@@ -287,8 +289,8 @@ def compute_distillation_output_loss(p, t_p, nc, distill_ratio):
             c_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1,
                                                            1, 1, 1, nc)
             # t_lcls += torch.mean(c_obj_scale * (pi[..., 5:] - t_pi[..., 5:]) ** 2)
-            t_lcls += torch.mean(DclsLoss(pi[..., 5:].sigmoid(),
-                                 t_pi[..., 5:]).sigmoid() * c_obj_scale)
+            t_lcls += torch.mean(DclsLoss(pi[..., 5:],
+                                 t_pi[..., 5:]) * c_obj_scale)
 
         # t_lobj += torch.mean(t_obj_scale * (pi[..., 4] - t_pi[..., 4]) ** 2)
         t_lobj += torch.mean(DobjLoss(pi[..., 4], t_pi[..., 4]) * t_obj_scale)
@@ -298,6 +300,7 @@ def compute_distillation_output_loss(p, t_p, nc, distill_ratio):
     bs = p[0].shape[0]  # batch size
     loss = (t_lobj + t_lbox + t_lcls) * bs
     return loss, torch.cat((t_lbox, t_lobj, t_lcls, t_lcls, loss)).detach()
+
 
 class ComputeDstillLoss:
     # Compute losses
@@ -351,7 +354,7 @@ class ComputeDstillLoss:
     # predictions, targets, model
     def __call__(self, p, targets, soft_loss=False, without_cls_loss=False):
         device = targets.device
-        lcls, lbox, lobj, ldistill = torch.zeros(1, device=device), torch.zeros(
+        lcls, lbox, lobj, lsoft = torch.zeros(1, device=device), torch.zeros(
             1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device)
         tcls, tbox, tlogits, indices, anchors = self.build_targets(
             p, targets)  # targets
@@ -388,12 +391,11 @@ class ComputeDstillLoss:
                         tlogits[i], self.cn, device=device)  # targets
                     td[range(n)] = tlogits[i]
                     if soft_loss:
-                        # ldistill += self.KlSoftmaxLoss(ps[:, 5:], td)
-                        ldistill += self.SigmoidCrossEntry(
+                        # lsoft += self.KlSoftmaxLoss(ps[:, 5:], td)
+                        lsoft += self.SigmoidCrossEntry(
                             ps[:, 5:], td.sigmoid())
                     else:
-                        ldistill += self.L2Logits(ps[:,
-                                                  5:].sigmoid(), td.sigmoid())
+                        lsoft += self.L2Logits(ps[:, 5:], td)
 
             obji = self.BCEobj(pi[..., 4], tobj)
             lobj += obji * self.balance[i]  # obj loss
@@ -406,13 +408,13 @@ class ComputeDstillLoss:
         lbox *= self.hyp['box']
         lobj *= self.hyp['obj']
         lcls *= self.hyp['cls']
-        ldistill *= self.distill_ratio
+        lsoft *= self.distill_ratio
         bs = tobj.shape[0]  # batch size
         if without_cls_loss:
-            loss = lbox + lobj + ldistill
+            loss = lbox + lobj + lsoft
         else:
-            loss = lbox + lobj + lcls + ldistill
-        return loss * bs, torch.cat((lbox, lobj, lcls, ldistill, loss)).detach()
+            loss = lbox + lobj + lcls + lsoft
+        return loss * bs, torch.cat((lbox, lobj, lcls, lsoft, loss)).detach()
 
     def build_targets(self, p, targets):
         # Build targets for compute_loss(), input targets(image,class,x,y,w,h)
