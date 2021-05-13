@@ -316,15 +316,18 @@ def train(hyp, opt, device, tb_writer=None):
                     _, t_targets = teacher_model.generate_batch_targets(
                         imgs, opt.img_size)
                     loss, loss_items = compute_distill_loss(pred, t_targets, nc)
+                    pred_num = 0
                 else:
                     t_targets, _ = teacher_model.generate_batch_targets(
                         imgs, opt.img_size)
                     loss, loss_items = compute_distill_loss(
                         pred, t_targets.to(device), opt.soft_loss, opt.without_cls_loss)
+                    pred_num = t_targets.shape[0]
                 if opt.with_gt_loss:
                     gt_loss, gt_loss_items = compute_loss(pred, targets.to(device))
                     loss += gt_loss
                     loss_items += gt_loss_items
+                    pred_num = targets.shape[0]
                     
                 if rank != -1:
                     loss *= opt.world_size  # gradient averaged between devices in DDP mode
@@ -349,12 +352,12 @@ def train(hyp, opt, device, tb_writer=None):
                 mem = '%.3gG' % (torch.cuda.memory_reserved(
                 ) / 1E9 if torch.cuda.is_available() else 0)  # (GB)
                 s = ('%10s' * 2 + '%10.4g' * 7) % (
-                    '%g/%g' % (epoch, epochs - 1), mem, *mloss, t_targets.shape[0], imgs.shape[-1])
+                    '%g/%g' % (epoch, epochs - 1), mem, *mloss, pred_num, imgs.shape[-1])
                 pbar.set_description(s)
 
             # end batch ------------------------------------------------------------------------------------------------
         Lfile.write('\n'+('%10s' * 2 + '%10.4g' * 7) % (
-                    '%g/%g' % (epoch, epochs - 1), mem, *mloss, t_targets.shape[0], imgs.shape[-1]))
+                    '%g/%g' % (epoch, epochs - 1), mem, *mloss, pred_num, imgs.shape[-1]))
         # end epoch ----------------------------------------------------------------------------------------------------
 
         # Scheduler
