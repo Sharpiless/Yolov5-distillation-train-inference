@@ -1,2 +1,0 @@
-
-     Epoch   gpu_mem       box       obj       cls   distill     total   obj_num  img_size
