@@ -316,7 +316,8 @@ def train(hyp, opt, device, tb_writer=None):
                     _, t_targets = teacher_model.generate_batch_targets(
                         imgs, opt.img_size)
                     loss, loss_items = compute_distill_loss(
-                        pred, t_targets, nc, opt.distill_ratio)
+                        pred, t_targets, nc, opt.distill_ratio,
+                        opt.temperature, opt.soft_loss)
                     pred_num = 0
                 else:
                     t_targets, _ = teacher_model.generate_batch_targets(
