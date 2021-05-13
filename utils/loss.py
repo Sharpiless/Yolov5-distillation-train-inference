@@ -288,7 +288,6 @@ def compute_distillation_output_loss(p, t_p, nc, distill_ratio, T=10, soft_loss=
         if nc > 1:  # cls loss (only if multiple classes)
             c_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1,
                                                            1, 1, 1, nc)
-            # t_lcls += torch.mean(c_obj_scale * (pi[..., 5:] - t_pi[..., 5:]) ** 2)
             if soft_loss:
                 t_lcls += nn.KLDivLoss()(F.log_softmax(pi[..., 5:]/T, dim=-1),
                                          F.softmax(t_pi[..., 5:]/T, dim=-1)) * (T * T)
@@ -296,7 +295,6 @@ def compute_distillation_output_loss(p, t_p, nc, distill_ratio, T=10, soft_loss=
                 t_lcls += torch.mean(DclsLoss(pi[..., 5:],
                                     t_pi[..., 5:]) * c_obj_scale)
 
-        # t_lobj += torch.mean(t_obj_scale * (pi[..., 4] - t_pi[..., 4]) ** 2)
         t_lobj += torch.mean(DobjLoss(pi[..., 4], t_pi[..., 4]) * t_obj_scale)
     t_lbox *= dhyp['giou'] * distill_ratio
     t_lobj *= dhyp['obj'] * distill_ratio
