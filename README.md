@@ -7,6 +7,12 @@ https://github.com/Sharpiless/Yolov5-distillation-train-inference
 
 ![](https://github.com/Sharpiless/Yolov5-distillation-train-inference/blob/main/data/images/YOLOv5%E8%92%B8%E9%A6%8F.png)
 
+# 教师模型权重：
+
+链接：[https://pan.baidu.com/s/13gq5QwCrRNdRXWzSYUeJIw ](https://pan.baidu.com/s/13gq5QwCrRNdRXWzSYUeJIw )
+
+提取码：4ppv 
+
 # 蒸馏训练：
 
 ```bash
