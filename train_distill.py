@@ -498,7 +498,7 @@ if __name__ == '__main__':
     parser.add_argument('--data', type=str,
                         default='data/voc.yaml', help='data.yaml path')
     parser.add_argument(
-        '--hyp', type=str, default='data/hyp.scratch.yaml', help='hyperparameters path')
+        '--hyp', type=str, default='data/hyp_distill.scratch.yaml', help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=30)
     parser.add_argument('--batch-size', type=int, default=4,
                         help='total batch size for all GPUs')
