@@ -324,6 +324,7 @@ def train(hyp, opt, device, tb_writer=None):
                     loss, loss_items = compute_distill_loss(
                         pred, t_targets.to(device), opt.soft_loss, opt.without_cls_loss)
                     pred_num = t_targets.shape[0]
+                    
                 if opt.with_gt_loss:
                     gt_loss, gt_loss_items = compute_loss(
                         pred, targets.to(device))
