@@ -562,7 +562,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
     @staticmethod
     def collate_fn(batch):
         img, path, shapes = zip(*batch)  # transposed
-        return torch.stack(img, 0), path, shapes
+        return torch.stack(img, 0), None, path, shapes
 
     @staticmethod
     def collate_fn4(batch):

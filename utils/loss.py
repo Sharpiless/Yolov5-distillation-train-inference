@@ -143,6 +143,7 @@ class ComputeLoss:
         device = targets.device
         lcls, lbox, lobj = torch.zeros(1, device=device), torch.zeros(
             1, device=device), torch.zeros(1, device=device)  # 三个loss
+        ldistill = torch.zeros(1, device=device)
         tcls, tbox, indices, anchors = self.build_targets(
             p, targets)  # targets
 
@@ -193,7 +194,7 @@ class ComputeLoss:
         bs = tobj.shape[0]  # batch size
 
         loss = lbox + lobj + lcls
-        return loss * bs, torch.cat((lbox, lobj, lcls, loss)).detach()
+        return loss * bs, torch.cat((lbox, lobj, lcls, ldistill, loss)).detach()
 
     def build_targets(self, p, targets):
         # Build targets for compute_loss(), input targets(image,class,x,y,w,h)

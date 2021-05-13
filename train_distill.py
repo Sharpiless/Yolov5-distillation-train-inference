@@ -1,17 +1,14 @@
 import argparse
 import logging
-import math
 import os
 import random
 import time
 from copy import deepcopy
 from pathlib import Path
-from threading import Thread
 
 import numpy as np
 import torch.distributed as dist
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 import torch.utils.data
@@ -28,11 +25,11 @@ from utils.datasets import create_dataloader
 from utils.datasets_still import create_dataloader as create_train_dataloader
 from utils.general import increment_path, init_seeds, \
     fitness, strip_optimizer, get_latest_run, check_dataset, \
-    check_file, check_git_status, check_img_size, \
+    check_file, check_img_size, \
     check_requirements, print_mutation, set_logging, one_cycle, colorstr
 from utils.google_utils import attempt_download
 from utils.loss import ComputeLoss, ComputeDstillLoss, compute_distillation_output_loss
-from utils.plots import plot_images, plot_labels, plot_results, plot_evolution
+from utils.plots import plot_results, plot_evolution
 from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_distributed_zero_first, is_parallel
 from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
 from teacher import TeacherModel
@@ -227,10 +224,16 @@ def train(hyp, opt, device, tb_writer=None):
             model.half().float()  # pre-reduce anchor precision
 
     # Trainloader
-    dataloader, dataset = create_train_dataloader(train_path, imgsz, batch_size, gs, opt,
-                                                  hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
-                                                  world_size=opt.world_size, workers=opt.workers,
-                                                  image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
+    if opt.with_gt_loss:
+        dataloader, _ = create_dataloader(train_path, imgsz, batch_size, gs, opt,
+                                                    hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
+                                                    world_size=opt.world_size, workers=opt.workers,
+                                                    image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
+    else:
+        dataloader, _ = create_train_dataloader(train_path, imgsz, batch_size, gs, opt,
+                                                    hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
+                                                    world_size=opt.world_size, workers=opt.workers,
+                                                    image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
     nb = len(dataloader)  # number of batches
 
     # DDP mode
@@ -256,7 +259,6 @@ def train(hyp, opt, device, tb_writer=None):
     # number of warmup iterations, max(3 epochs, 1k iterations)
     nw = max(round(hyp['warmup_epochs'] * nb), 1000)
     # nw = min(nw, (epochs - start_epoch) / 2 * nb)  # limit warmup to < 1/2 of training
-    maps = np.zeros(nc)  # mAP per class
     # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
     results = (0, 0, 0, 0, 0, 0, 0)
     scheduler.last_epoch = start_epoch - 1  # do not move
@@ -287,7 +289,7 @@ def train(hyp, opt, device, tb_writer=None):
         if rank in [-1, 0]:
             pbar = tqdm(pbar, total=nb)  # progress bar
         optimizer.zero_grad()
-        for i, (imgs, _, paths, _) in pbar:
+        for i, (imgs, targets, _, _) in pbar:
             # number integrated batches (since train start)
             ni = i + nb * epoch
             imgs = imgs.to(device, non_blocking=True).float() / \
@@ -319,7 +321,11 @@ def train(hyp, opt, device, tb_writer=None):
                         imgs, opt.img_size)
                     loss, loss_items = compute_distill_loss(
                         pred, t_targets.to(device), opt.soft_loss, opt.without_cls_loss)
-
+                if opt.with_gt_loss:
+                    gt_loss, gt_loss_items = compute_loss(pred, targets.to(device))
+                    loss += gt_loss
+                    loss_items += gt_loss_items
+                    
                 if rank != -1:
                     loss *= opt.world_size  # gradient averaged between devices in DDP mode
                 if opt.quad:
@@ -363,7 +369,7 @@ def train(hyp, opt, device, tb_writer=None):
             final_epoch = epoch + 1 == epochs
             if not opt.notest or final_epoch:  # Calculate mAP
                 wandb_logger.current_epoch = epoch + 1
-                results, maps, times = test.test(data_dict,
+                results, _, _ = test.test(data_dict,
                                                  batch_size=batch_size * 2,
                                                  imgsz=imgsz_test,
                                                  model=ema.ema,
@@ -489,6 +495,8 @@ if __name__ == '__main__':
                         default=0.3, help='teacher nms iou threshold')
     parser.add_argument('--full-output-loss',
                         action='store_true', help='use full output to compute distill loss')
+    parser.add_argument('--with-gt-loss',
+                        action='store_true', help='use ground truth to compute distill loss')
     parser.add_argument('--temperature', type=float,
                         default=10.0, help='temperature in soft softmax distillation loss')
     parser.add_argument('--cfg', type=str,
