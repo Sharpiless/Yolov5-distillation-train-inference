@@ -391,9 +391,9 @@ class ComputeDstillLoss:
                         tlogits[i], self.cn, device=device)  # targets
                     td[range(n)] = tlogits[i]
                     if soft_loss:
-                        # lsoft += self.KlSoftmaxLoss(ps[:, 5:], td)
-                        lsoft += self.SigmoidCrossEntry(
-                            ps[:, 5:], td.sigmoid())
+                        lsoft += self.KlSoftmaxLoss(ps[:, 5:], td)
+                        # lsoft += self.SigmoidCrossEntry(
+                        #     ps[:, 5:], td.sigmoid())
                     else:
                         lsoft += self.L2Logits(ps[:, 5:], td)
 
