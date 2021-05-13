@@ -261,7 +261,7 @@ class ComputeLoss:
         return tcls, tbox, indices, anch
 
 
-def compute_distillation_output_loss(p, t_p, nc):
+def compute_distillation_output_loss(p, t_p, nc, distill_ratio):
     t_ft = torch.cuda.FloatTensor if t_p[0].is_cuda else torch.Tensor
     t_lcls, t_lbox, t_lobj = t_ft([0]), t_ft([0]), t_ft([0])
     red = 'mean'  # Loss reduction (sum or mean)
@@ -292,9 +292,9 @@ def compute_distillation_output_loss(p, t_p, nc):
 
         # t_lobj += torch.mean(t_obj_scale * (pi[..., 4] - t_pi[..., 4]) ** 2)
         t_lobj += torch.mean(DobjLoss(pi[..., 4], t_pi[..., 4]) * t_obj_scale)
-    t_lbox *= dhyp['giou'] * dhyp['dist']
-    t_lobj *= dhyp['obj'] * dhyp['dist']
-    t_lcls *= dhyp['cls'] * dhyp['dist']
+    t_lbox *= dhyp['giou'] * distill_ratio
+    t_lobj *= dhyp['obj'] * distill_ratio
+    t_lcls *= dhyp['cls'] * distill_ratio
     bs = p[0].shape[0]  # batch size
     loss = (t_lobj + t_lbox + t_lcls) * bs
     return loss, torch.cat((t_lbox, t_lobj, t_lcls, t_lcls, loss)).detach()

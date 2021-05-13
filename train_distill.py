@@ -226,14 +226,14 @@ def train(hyp, opt, device, tb_writer=None):
     # Trainloader
     if opt.with_gt_loss:
         dataloader, _ = create_dataloader(train_path, imgsz, batch_size, gs, opt,
-                                                    hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
-                                                    world_size=opt.world_size, workers=opt.workers,
-                                                    image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
+                                          hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
+                                          world_size=opt.world_size, workers=opt.workers,
+                                          image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
     else:
         dataloader, _ = create_train_dataloader(train_path, imgsz, batch_size, gs, opt,
-                                                    hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
-                                                    world_size=opt.world_size, workers=opt.workers,
-                                                    image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
+                                                hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
+                                                world_size=opt.world_size, workers=opt.workers,
+                                                image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
     nb = len(dataloader)  # number of batches
 
     # DDP mode
@@ -283,9 +283,9 @@ def train(hyp, opt, device, tb_writer=None):
             dataloader.sampler.set_epoch(epoch)
         pbar = enumerate(dataloader)
         logger.info(('\n' + '%10s' * 9) % ('Epoch', 'gpu_mem', 'box',
-                                           'obj', 'cls', 'distill', 'total', 'obj_num', 'img_size'))
+                                           'obj', 'cls', 'soft', 'total', 'obj_num', 'img_size'))
         Lfile.write(('\n' + '%10s' * 9) % ('Epoch', 'gpu_mem', 'box',
-                                           'obj', 'cls', 'distill', 'total', 'obj_num', 'img_size'))
+                                           'obj', 'cls', 'soft', 'total', 'obj_num', 'img_size'))
         if rank in [-1, 0]:
             pbar = tqdm(pbar, total=nb)  # progress bar
         optimizer.zero_grad()
@@ -315,7 +315,8 @@ def train(hyp, opt, device, tb_writer=None):
                 if opt.full_output_loss:
                     _, t_targets = teacher_model.generate_batch_targets(
                         imgs, opt.img_size)
-                    loss, loss_items = compute_distill_loss(pred, t_targets, nc)
+                    loss, loss_items = compute_distill_loss(
+                        pred, t_targets, nc, opt.distill_ratio)
                     pred_num = 0
                 else:
                     t_targets, _ = teacher_model.generate_batch_targets(
@@ -324,11 +325,12 @@ def train(hyp, opt, device, tb_writer=None):
                         pred, t_targets.to(device), opt.soft_loss, opt.without_cls_loss)
                     pred_num = t_targets.shape[0]
                 if opt.with_gt_loss:
-                    gt_loss, gt_loss_items = compute_loss(pred, targets.to(device))
+                    gt_loss, gt_loss_items = compute_loss(
+                        pred, targets.to(device))
                     loss += gt_loss
                     loss_items += gt_loss_items
                     pred_num = targets.shape[0]
-                    
+
                 if rank != -1:
                     loss *= opt.world_size  # gradient averaged between devices in DDP mode
                 if opt.quad:
@@ -373,17 +375,17 @@ def train(hyp, opt, device, tb_writer=None):
             if not opt.notest or final_epoch:  # Calculate mAP
                 wandb_logger.current_epoch = epoch + 1
                 results, _, _ = test.test(data_dict,
-                                                 batch_size=batch_size * 2,
-                                                 imgsz=imgsz_test,
-                                                 model=ema.ema,
-                                                 single_cls=opt.single_cls,
-                                                 dataloader=testloader,
-                                                 save_dir=save_dir,
-                                                 verbose=nc < 50 and final_epoch,
-                                                 plots=plots and final_epoch,
-                                                 wandb_logger=wandb_logger,
-                                                 compute_loss=compute_loss,
-                                                 is_coco=is_coco)
+                                          batch_size=batch_size * 2,
+                                          imgsz=imgsz_test,
+                                          model=ema.ema,
+                                          single_cls=opt.single_cls,
+                                          dataloader=testloader,
+                                          save_dir=save_dir,
+                                          verbose=nc < 50 and final_epoch,
+                                          plots=plots and final_epoch,
+                                          wandb_logger=wandb_logger,
+                                          compute_loss=compute_loss,
+                                          is_coco=is_coco)
 
             # Write
             with open(results_file, 'a') as f:
