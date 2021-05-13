@@ -430,11 +430,9 @@ class ComputeDstillLoss:
             na, 1).repeat(1, nt)  # same as .repeat_interleave(nt)
         # append anchor indices
         targets = torch.cat((targets.repeat(na, 1, 1), ai[:, :, None]), 2)
-        # targets.shape = (3, 16, 6+20+1)
         g = 0.5  # bias
         off = torch.tensor([[0, 0],
                             [1, 0], [0, 1], [-1, 0], [0, -1],  # j,k,l,m
-                            # [1, 1], [1, -1], [-1, 1], [-1, -1],  # jk,jm,lk,lm
                             ], device=targets.device).float() * g  # offsets
 
         for i in range(self.nl):
