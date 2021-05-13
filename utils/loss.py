@@ -287,8 +287,8 @@ def compute_distillation_output_loss(p, t_p, nc, distill_ratio):
             c_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1,
                                                            1, 1, 1, nc)
             # t_lcls += torch.mean(c_obj_scale * (pi[..., 5:] - t_pi[..., 5:]) ** 2)
-            t_lcls += torch.mean(DclsLoss(pi[..., 5:],
-                                 t_pi[..., 5:]) * c_obj_scale)
+            t_lcls += torch.mean(DclsLoss(pi[..., 5:].sigmoid(),
+                                 t_pi[..., 5:]).sigmoid() * c_obj_scale)
 
         # t_lobj += torch.mean(t_obj_scale * (pi[..., 4] - t_pi[..., 4]) ** 2)
         t_lobj += torch.mean(DobjLoss(pi[..., 4], t_pi[..., 4]) * t_obj_scale)
