@@ -287,7 +287,7 @@ def train(hyp, opt, device, tb_writer=None):
         if rank in [-1, 0]:
             pbar = tqdm(pbar, total=nb)  # progress bar
         optimizer.zero_grad()
-        for i, (imgs, paths, _) in pbar:
+        for i, (imgs, _, paths, _) in pbar:
             # number integrated batches (since train start)
             ni = i + nb * epoch
             imgs = imgs.to(device, non_blocking=True).float() / \

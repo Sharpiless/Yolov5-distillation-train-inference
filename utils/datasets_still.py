@@ -583,7 +583,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                     (torch.cat((img[i], img[i + 1]), 1), torch.cat((img[i + 2], img[i + 3]), 1)), 2)
             img4.append(im)
 
-        return torch.stack(img4, 0), path4, shapes4
+        return torch.stack(img4, 0), None, path4, shapes4
 
 
 # Ancillary functions --------------------------------------------------------------------------------------------------
