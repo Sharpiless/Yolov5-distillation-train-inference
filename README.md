@@ -32,6 +32,8 @@ python train_distill.py --weights yolov5s.pt \
 
 > --with-gt-loss：是否同时使用ground truth
 
+> --soft-loss：是否使用KL散度作为蒸馏的类别损失（缺省使用L2-logits损失）
+
 > --full-output-loss：是否使用[《Object detection at 200 Frames Per Second》](https://arxiv.org/pdf/1805.06361.pdf)中的损失
 
 这篇文章分别对这几个损失函数做出改进，具体思路为只有当teacher network的objectness value高时，才学习bounding box坐标和class probabilities。
