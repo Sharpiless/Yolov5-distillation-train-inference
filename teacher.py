@@ -10,12 +10,13 @@ import torch
 
 
 class TeacherModel(object):
-    def __init__(self, conf_thres=0.5, iou_thres=0.3, imgsz=640):
+    def __init__(self, conf_thres=0.5, iou_thres=0.3, imgsz=640, training=False):
         self.model = None
         self.device = None
         self.conf_thres = conf_thres
         self.iou_thres = iou_thres
         self.imgsz = imgsz
+        self.training = training
 
     def init_model(self, weights, device, batch_size, nc, teacher_cfg):
 
@@ -29,7 +30,10 @@ class TeacherModel(object):
         state_dict = intersect_dicts(
             state_dict, self.model.state_dict(), exclude=['anchor'])  # intersect
         self.model.load_state_dict(state_dict, strict=False)  # load
-        self.model.eval()
+        if self.training:
+            self.model.train()
+        else:
+            self.model.eval()
         self.stride = int(self.model.stride.max())
         self.nc = nc
 
@@ -77,32 +81,38 @@ class TeacherModel(object):
 
     def generate_batch_targets(self, imgs, tar_size=[640, 640]):
         targets = []
-        preds = self.model(imgs)[0]
-        with torch.no_grad():
-            for img_id in range(imgs.shape[0]):
+        if self.training:
+            preds = self.model(imgs)
+        else:
+            preds = self.model(imgs)[0]
+        if not self.training:
+            with torch.no_grad():
+                for img_id in range(imgs.shape[0]):
 
-                pred = preds[img_id:img_id+1]                
-                pred = non_max_suppression(
-                    pred, self.conf_thres, self.iou_thres, distill=True, agnostic=False)
+                    pred = preds[img_id:img_id+1]                
+                    pred = non_max_suppression(
+                        pred, self.conf_thres, self.iou_thres, distill=True, agnostic=False)
 
-                for i, det in enumerate(pred):  # detections per image
-                    gn = torch.tensor(tar_size)[[1, 0, 1, 0]]
-                    if len(det):
-                        # Rescale boxes from img_size to img0 size
-                        det[:, :4] = scale_coords(
-                            imgs[img_id].unsqueeze(0).shape[2:], det[:, :4], tar_size).round()
+                    for i, det in enumerate(pred):  # detections per image
+                        gn = torch.tensor(tar_size)[[1, 0, 1, 0]]
+                        if len(det):
+                            # Rescale boxes from img_size to img0 size
+                            det[:, :4] = scale_coords(
+                                imgs[img_id].unsqueeze(0).shape[2:], det[:, :4], tar_size).round()
 
-                        for value in reversed(det):
-                            xyxy, conf, cls_id = value[:4], value[4], value[5]
-                            logits = value[-self.nc:].tolist()
-                            xywh = (xyxy2xywh(torch.tensor(xyxy.cpu()).view(1, 4)
-                                              ) / gn).view(-1).tolist()  # normalized xywh
-                            line = [img_id, int(cls_id)]
-                            line.extend(xywh)
-                            line.extend(logits)
-                            targets.append(line)
+                            for value in reversed(det):
+                                xyxy, conf, cls_id = value[:4], value[4], value[5]
+                                logits = value[-self.nc:].tolist()
+                                xywh = (xyxy2xywh(torch.tensor(xyxy.cpu()).view(1, 4)
+                                                ) / gn).view(-1).tolist()  # normalized xywh
+                                line = [img_id, int(cls_id)]
+                                line.extend(xywh)
+                                line.extend(logits)
+                                targets.append(line)
 
-        return torch.tensor(np.array(targets), dtype=torch.float32), preds
+            return torch.tensor(np.array(targets), dtype=torch.float32), None
+        else:
+            return [], preds
 
 
 if __name__ == '__main__':
@@ -113,11 +123,12 @@ if __name__ == '__main__':
     teacher = TeacherModel(conf_thres=0.01)
 
     teacher.init_model('weights/yolov5l.pt', '0', 1, 20, 'models/yolov5l.yaml')
-    img0 = cv2.imread('../xingren.jpg')
-    img0, bboxes = teacher.predict(img0)
-    cv2.imshow('winname', img0)
-    cv2.waitKey(0)
-    # teacher.init_model('weights/yolov5l.pt', '0', 2, 20, 'models/yolov5l.yaml')
-    # imgs = torch.rand((2, 3, 640, 640)).to(teacher.device)
-    # targets = teacher.generate_batch_targets(imgs)
+
+    # img0 = cv2.imread('../xingren.jpg')
+    # img0, bboxes = teacher.predict(img0)
+    # cv2.imshow('winname', img0)
+    # cv2.waitKey(0)
+
+    imgs = torch.rand((2, 3, 640, 640)).to(teacher.device)
+    targets = teacher.generate_batch_targets(imgs)
     

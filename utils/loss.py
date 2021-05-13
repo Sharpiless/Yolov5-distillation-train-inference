@@ -7,6 +7,27 @@ import torch.nn as nn
 from utils.general import bbox_iou
 from utils.torch_utils import is_parallel
 
+# Hyperparameters
+dhyp = {'lr0': 0.01,  # initial learning rate (SGD=1E-2, Adam=1E-3)
+       'momentum': 0.937,  # SGD momentum
+       'weight_decay': 5e-4,  # optimizer weight decay
+       'l1': False,  # smooth l1 loss or iou loss
+       'giou': 0.05,  # giou loss gain
+       'cls': 0.58,  # cls loss gain
+       'cls_pw': 1.0,  # cls BCELoss positive_weight
+       'obj': 1.0,  # obj loss gain (*=img_size/320 if img_size != 320)
+       'obj_pw': 1.0,  # obj BCELoss positive_weight
+       'iou_t': 0.20,  # iou training threshold
+       'anchor_t': 4.0,  # anchor-multiple threshold
+       'fl_gamma': 0.0,  # focal loss gamma (efficientDet default is gamma=1.5)
+       'hsv_h': 0.014,  # image HSV-Hue augmentation (fraction)
+       'hsv_s': 0.68,  # image HSV-Saturation augmentation (fraction)
+       'hsv_v': 0.36,  # image HSV-Value augmentation (fraction)
+       'degrees': 0.0,  # image rotation (+/- deg)
+       'translate': 0.0,  # image translation (+/- fraction)
+       'scale': 0.5,  # image scale (+/- gain)
+       'shear': 0.0,
+       'dist': 1.0}  # image shear (+/- deg)
 
 def smooth_BCE(eps=0.1):  # https://github.com/ultralytics/yolov3/issues/238#issuecomment-598028441
     # return positive, negative label smoothing BCE targets
@@ -239,10 +260,9 @@ class ComputeLoss:
         return tcls, tbox, indices, anch
 
 
-def compute_distillation_output_loss(p, t_p, model):
+def compute_distillation_output_loss(p, t_p, nc):
     t_ft = torch.cuda.FloatTensor if t_p[0].is_cuda else torch.Tensor
     t_lcls, t_lbox, t_lobj = t_ft([0]), t_ft([0]), t_ft([0])
-    h = model.hyp  # hyperparameters
     red = 'mean'  # Loss reduction (sum or mean)
     if red != "mean":
         raise NotImplementedError(
@@ -262,22 +282,21 @@ def compute_distillation_output_loss(p, t_p, model):
                              t_pi[..., :4]) * b_obj_scale)
 
         # Class
-        if model.nc > 1:  # cls loss (only if multiple classes)
+        if nc > 1:  # cls loss (only if multiple classes)
             c_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1,
-                                                           1, 1, 1, model.nc)
+                                                           1, 1, 1, nc)
             # t_lcls += torch.mean(c_obj_scale * (pi[..., 5:] - t_pi[..., 5:]) ** 2)
             t_lcls += torch.mean(DclsLoss(pi[..., 5:],
                                  t_pi[..., 5:]) * c_obj_scale)
 
         # t_lobj += torch.mean(t_obj_scale * (pi[..., 4] - t_pi[..., 4]) ** 2)
         t_lobj += torch.mean(DobjLoss(pi[..., 4], t_pi[..., 4]) * t_obj_scale)
-    t_lbox *= h['giou'] * h['dist']
-    t_lobj *= h['obj'] * h['dist']
-    t_lcls *= h['cls'] * h['dist']
+    t_lbox *= dhyp['giou'] * dhyp['dist']
+    t_lobj *= dhyp['obj'] * dhyp['dist']
+    t_lcls *= dhyp['cls'] * dhyp['dist']
     bs = p[0].shape[0]  # batch size
     loss = (t_lobj + t_lbox + t_lcls) * bs
-    return loss
-
+    return loss, torch.cat((t_lbox, t_lobj, t_lcls, t_lcls, loss)).detach()
 
 class ComputeDstillLoss:
     # Compute losses
@@ -392,7 +411,7 @@ class ComputeDstillLoss:
             loss = lbox + lobj + ldistill
         else:
             loss = lbox + lobj + lcls + ldistill
-        return loss * bs, torch.cat((lbox, lobj, lcls, loss, ldistill)).detach()
+        return loss * bs, torch.cat((lbox, lobj, lcls, ldistill, loss)).detach()
 
     def build_targets(self, p, targets):
         # Build targets for compute_loss(), input targets(image,class,x,y,w,h)

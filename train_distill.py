@@ -24,7 +24,6 @@ from tqdm import tqdm
 import test  # import test.py to get mAP after each epoch
 from models.experimental import attempt_load
 from models.yolo import Model
-from utils.autoanchor import check_anchors
 from utils.datasets import create_dataloader
 from utils.datasets_still import create_dataloader as create_train_dataloader
 from utils.general import increment_path, init_seeds, \
@@ -32,7 +31,7 @@ from utils.general import increment_path, init_seeds, \
     check_file, check_git_status, check_img_size, \
     check_requirements, print_mutation, set_logging, one_cycle, colorstr
 from utils.google_utils import attempt_download
-from utils.loss import ComputeLoss, ComputeDstillLoss
+from utils.loss import ComputeLoss, ComputeDstillLoss, compute_distillation_output_loss
 from utils.plots import plot_images, plot_labels, plot_results, plot_evolution
 from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_distributed_zero_first, is_parallel
 from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
@@ -115,7 +114,7 @@ def train(hyp, opt, device, tb_writer=None):
     assert os.path.exists(
         opt.teacher), '-[ERROR] tearcher weights do not exists.'
     teacher_model = TeacherModel(
-        conf_thres=opt.t_conf_thres, iou_thres=opt.t_nms_thres)
+        conf_thres=opt.t_conf_thres, iou_thres=opt.t_nms_thres, training=opt.full_output_loss)
     teacher_model.init_model(opt.teacher, opt.device, 1, nc, opt.teacher_cfg)
 
     # Freeze
@@ -225,17 +224,13 @@ def train(hyp, opt, device, tb_writer=None):
                                        pad=0.5, prefix=colorstr('val: '))[0]
 
         if not opt.resume:
-            # Anchors
-            if not opt.noautoanchor:
-                check_anchors(dataset, model=model,
-                              thr=hyp['anchor_t'], imgsz=imgsz)
             model.half().float()  # pre-reduce anchor precision
 
     # Trainloader
     dataloader, dataset = create_train_dataloader(train_path, imgsz, batch_size, gs, opt,
-                                            hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
-                                            world_size=opt.world_size, workers=opt.workers,
-                                            image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
+                                                  hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
+                                                  world_size=opt.world_size, workers=opt.workers,
+                                                  image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
     nb = len(dataloader)  # number of batches
 
     # DDP mode
@@ -267,8 +262,11 @@ def train(hyp, opt, device, tb_writer=None):
     scheduler.last_epoch = start_epoch - 1  # do not move
     scaler = amp.GradScaler(enabled=cuda)
     compute_loss = ComputeLoss(model)  # init loss class
-    compute_distill_loss = ComputeDstillLoss(
-        model, distill_ratio=opt.distill_ratio, temperature=opt.temperature)
+    if opt.full_output_loss:
+        compute_distill_loss = compute_distillation_output_loss
+    else:
+        compute_distill_loss = ComputeDstillLoss(
+            model, distill_ratio=opt.distill_ratio, temperature=opt.temperature)
     logger.info(f'Image sizes {imgsz} train, {imgsz_test} test\n'
                 f'Using {dataloader.num_workers} dataloader workers\n'
                 f'Logging results to {save_dir}\n'
@@ -312,9 +310,16 @@ def train(hyp, opt, device, tb_writer=None):
             # Forward
             with amp.autocast(enabled=cuda):
                 pred = model(imgs)  # forward
-                t_targets, _ = teacher_model.generate_batch_targets(imgs, opt.img_size)
-                loss, loss_items = compute_distill_loss(
-                    pred, t_targets.to(device), opt.soft_loss, opt.without_cls_loss)
+                if opt.full_output_loss:
+                    _, t_targets = teacher_model.generate_batch_targets(
+                        imgs, opt.img_size)
+                    loss, loss_items = compute_distill_loss(pred, t_targets, nc)
+                else:
+                    t_targets, _ = teacher_model.generate_batch_targets(
+                        imgs, opt.img_size)
+                    loss, loss_items = compute_distill_loss(
+                        pred, t_targets.to(device), opt.soft_loss, opt.without_cls_loss)
+
                 if rank != -1:
                     loss *= opt.world_size  # gradient averaged between devices in DDP mode
                 if opt.quad:
@@ -477,11 +482,13 @@ if __name__ == '__main__':
     parser.add_argument('--soft-loss', action='store_true',
                         help='using soft label distill loss rather than l2 loss')
     parser.add_argument('--distill-ratio', type=float,
-                        default=0.001, help='distill loss ratio in total loss')
+                        default=0.5, help='distill loss ratio in total loss')
     parser.add_argument('--t_conf_thres', type=float,
                         default=0.1, help='teacher confidence threshold')
     parser.add_argument('--t_nms_thres', type=float,
                         default=0.3, help='teacher nms iou threshold')
+    parser.add_argument('--full-output-loss',
+                        action='store_true', help='use full output to compute distill loss')
     parser.add_argument('--temperature', type=float,
                         default=10.0, help='temperature in soft softmax distillation loss')
     parser.add_argument('--cfg', type=str,
@@ -505,8 +512,6 @@ if __name__ == '__main__':
                         help='only save final checkpoint')
     parser.add_argument('--notest', action='store_true',
                         help='only test final epoch')
-    parser.add_argument('--noautoanchor', default=True,
-                        help='disable autoanchor check')
     parser.add_argument('--evolve', action='store_true',
                         help='evolve hyperparameters')
     parser.add_argument('--bucket', type=str, default='', help='gsutil bucket')
