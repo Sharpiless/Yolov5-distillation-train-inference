@@ -273,6 +273,7 @@ class ComputeOutbasedDstillLoss:
         self.DclsLoss = nn.MSELoss(reduction="none")
         self.DobjLoss = nn.MSELoss(reduction="none")
         self.DsoftLoss = nn.KLDivLoss(reduction="none")
+        self.BCELoss = nn.BCEWithLogitsLoss(reduction="none")
 
     def __call__(self, p, t_p, soft_loss='kl'):
         t_ft = torch.cuda.FloatTensor if t_p[0].is_cuda else torch.Tensor
@@ -292,14 +293,17 @@ class ComputeOutbasedDstillLoss:
             if self.nc > 1:  # cls loss (only if multiple classes)
                 c_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1,
                                                                1, 1, 1, self.nc)
-                if soft_loss == 'kl' or soft_loss == 'mix':
+                if soft_loss == 'kl':
                     kl_loss = self.DsoftLoss(F.log_softmax(pi[..., 5:]/self.T, dim=-1),
                                              F.softmax(t_pi[..., 5:]/self.T, dim=-1)) * (self.T * self.T)
                     kl_loss = torch.sum(kl_loss, dim=-1)
                     t_lsoft += torch.mean(kl_loss * t_obj_scale)
-                elif soft_loss == 'l2' or soft_loss == 'mix':
+                elif soft_loss == 'l2':
                     t_lsoft += torch.mean(self.DclsLoss(pi[..., 5:],
                                                        t_pi[..., 5:]) * c_obj_scale)
+                else:
+                    t_lsoft += torch.mean(self.BCELoss(pi[..., 5:],
+                                                       t_pi[..., 5:].sigmoid()) * c_obj_scale)
 
             t_lobj += torch.mean(self.DobjLoss(pi[..., 4],
                                  t_pi[..., 4]) * t_obj_scale)
@@ -394,9 +398,9 @@ class ComputeDstillLoss:
                         ps[:, 5:], self.cn, device=device)  # targets
                     t[range(n), tcls[i]] = self.cp
                     lcls += self.BCEcls(ps[:, 5:], t)  # BCE
-                    if soft_loss == 'kl' or soft_loss == 'mix':
+                    if soft_loss == 'kl':
                         lsoft += self.KlSoftmaxLoss(ps[:, 5:], tlogits[i])
-                    if soft_loss == 'l2' or soft_loss == 'mix':
+                    if soft_loss == 'l2':
                         lsoft += self.L2Logits(ps[:, 5:], tlogits[i])
 
             obji = self.BCEobj(pi[..., 4], tobj)

@@ -282,7 +282,7 @@ def train(hyp, opt, device, tb_writer=None):
                 f'Starting training for {epochs} epochs...')
     # epoch ------------------------------------------------------------------
     assert opt.soft_loss in [
-        'kl', 'l2', 'mix'], 'ERROR: --soft-loss must be one of [kl, l2, mix]'
+        'kl', 'l2'], 'ERROR: --soft-loss must be one of [kl, l2]'
     for epoch in range(start_epoch, epochs):
         model.train()
 
@@ -487,7 +487,7 @@ if __name__ == '__main__':
     parser.add_argument('--teacher', type=str,
                         default='weights/yolov5l.pt', help='teacher weights path')
     parser.add_argument('--soft-loss', default='kl',
-                        help='using KL distill loss、l2 loss or mix loss')
+                        help='using KL distill loss or l2 loss')
     parser.add_argument('--distill-ratio', type=float,
                         default=0.5, help='distill loss ratio in total loss')
     parser.add_argument('--t_conf_thres', type=float,
