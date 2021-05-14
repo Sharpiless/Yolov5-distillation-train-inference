@@ -273,7 +273,6 @@ def train(hyp, opt, device, tb_writer=None):
                 f'Using {dataloader.num_workers} dataloader workers\n'
                 f'Logging results to {save_dir}\n'
                 f'Starting training for {epochs} epochs...')
-    Lfile = open('logger.txt', 'w')
     # epoch ------------------------------------------------------------------
     for epoch in range(start_epoch, epochs):
         model.train()
@@ -283,8 +282,6 @@ def train(hyp, opt, device, tb_writer=None):
             dataloader.sampler.set_epoch(epoch)
         pbar = enumerate(dataloader)
         logger.info(('\n' + '%10s' * 9) % ('Epoch', 'gpu_mem', 'box',
-                                           'obj', 'cls', 'soft', 'total', 'obj_num', 'img_size'))
-        Lfile.write(('\n' + '%10s' * 9) % ('Epoch', 'gpu_mem', 'box',
                                            'obj', 'cls', 'soft', 'total', 'obj_num', 'img_size'))
         if rank in [-1, 0]:
             pbar = tqdm(pbar, total=nb)  # progress bar
@@ -322,8 +319,7 @@ def train(hyp, opt, device, tb_writer=None):
                 else:
                     t_targets, _ = teacher_model.generate_batch_targets(
                         imgs, opt.img_size)
-                    loss, loss_items = compute_distill_loss(
-                        pred, t_targets.to(device), opt.soft_loss, opt.without_cls_loss)
+                    loss, loss_items = compute_distill_loss(pred, t_targets.to(device), opt.soft_loss)
                     pred_num = t_targets.shape[0]
                     
                 if opt.with_gt_loss:
@@ -360,8 +356,6 @@ def train(hyp, opt, device, tb_writer=None):
                 pbar.set_description(s)
 
             # end batch ------------------------------------------------------------------------------------------------
-        Lfile.write('\n'+('%10s' * 2 + '%10.4g' * 7) % (
-                    '%g/%g' % (epoch, epochs - 1), mem, *mloss, pred_num, imgs.shape[-1]))
         # end epoch ----------------------------------------------------------------------------------------------------
 
         # Scheduler
@@ -398,7 +392,7 @@ def train(hyp, opt, device, tb_writer=None):
                           (results_file, opt.bucket, opt.name))
 
             # Log
-            tags = ['train/box_loss', 'train/obj_loss', 'train/cls_loss',  # train loss
+            tags = ['train/box_loss', 'train/obj_loss', 'train/cls_loss', 'train/soft_loss',  # train loss
                     'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/mAP_0.5:0.95',
                     'val/box_loss', 'val/obj_loss', 'val/cls_loss',  # val loss
                     'x/lr0', 'x/lr1', 'x/lr2']  # params
@@ -438,7 +432,6 @@ def train(hyp, opt, device, tb_writer=None):
 
         # end epoch ----------------------------------------------------------------------------------------------------
     # end training
-    Lfile.close()
     if rank in [-1, 0]:
         # Plots
         if plots:
@@ -492,8 +485,8 @@ if __name__ == '__main__':
                         default='weights/yolov5l.pt', help='teacher weights path')
     parser.add_argument('--without-cls-loss', action='store_true',
                         help='using only distill logits loss in total loss')
-    parser.add_argument('--soft-loss', action='store_true',
-                        help='using soft label distill loss rather than l2 loss')
+    parser.add_argument('--KL-loss', action='store_true',
+                        help='using KL distill loss rather than l2 loss')
     parser.add_argument('--distill-ratio', type=float,
                         default=0.5, help='distill loss ratio in total loss')
     parser.add_argument('--t_conf_thres', type=float,

@@ -318,8 +318,7 @@ class ComputeDstillLoss:
         BCEobj = nn.BCEWithLogitsLoss(
             pos_weight=torch.tensor([h['obj_pw']], device=device))
         self.L2Logits = nn.MSELoss()
-        self.CrossEntropyLoss = torch.nn.CrossEntropyLoss()
-        # Class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
+        self.KLDistillLoss = nn.KLDivLoss()
         # positive, negative BCE targets
         self.cp, self.cn = smooth_BCE(eps=h.get('label_smoothing', 0.0))
 
@@ -335,8 +334,6 @@ class ComputeDstillLoss:
         self.ssi = list(det.stride).index(
             16) if autobalance else 0  # stride 16 index
         self.BCEcls, self.BCEobj, self.gr, self.hyp, self.autobalance = BCEcls, BCEobj, model.gr, h, autobalance
-        self.SigmoidCrossEntry = torch.nn.BCEWithLogitsLoss(
-            pos_weight=torch.tensor([h['cls_pw']], device=device))
         for k in 'na', 'nc', 'nl', 'anchors':
             setattr(self, k, getattr(det, k))
 
@@ -348,13 +345,13 @@ class ComputeDstillLoss:
         and student expects the input tensor to be log probabilities! See Issue #2
         """
         T = self.T
-        KD_loss = nn.KLDivLoss()(F.log_softmax(student_var/T, dim=-1),
+        KD_loss = self.KLDistillLoss(F.log_softmax(student_var/T, dim=-1),
                                  F.softmax(teacher_var/T, dim=-1)) * (T * T)
 
         return KD_loss
 
     # predictions, targets, model
-    def __call__(self, p, targets, soft_loss=False, without_cls_loss=False):
+    def __call__(self, p, targets, soft_loss=False):
         device = targets.device
         lcls, lbox, lobj, lsoft = torch.zeros(1, device=device), torch.zeros(
             1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device)
@@ -394,8 +391,6 @@ class ComputeDstillLoss:
                     td[range(n)] = tlogits[i]
                     if soft_loss:
                         lsoft += self.KlSoftmaxLoss(ps[:, 5:], td)
-                        # lsoft += self.SigmoidCrossEntry(
-                        #     ps[:, 5:], td.sigmoid())
                     else:
                         lsoft += self.L2Logits(ps[:, 5:], td)
 
@@ -412,10 +407,7 @@ class ComputeDstillLoss:
         lcls *= self.hyp['cls']
         lsoft *= self.distill_ratio
         bs = tobj.shape[0]  # batch size
-        if without_cls_loss:
-            loss = lbox + lobj + lsoft
-        else:
-            loss = lbox + lobj + lcls + lsoft
+        loss = lbox + lobj + lsoft
         return loss * bs, torch.cat((lbox, lobj, lcls, lsoft, loss)).detach()
 
     def build_targets(self, p, targets):
@@ -447,8 +439,7 @@ class ComputeDstillLoss:
                 r = t[:, :, 4:6] / anchors[:, None]  # wh ratio (3, 16, 2)
                 j = torch.max(
                     r, 1. / r).max(2)[0] < self.hyp['anchor_t']  # compare (3, 16)
-                # j = wh_iou(anchors, t[:, 4:6]) > model.hyp['iou_t']  # iou(3,n)=wh_iou(anchors(3,2), gwh(n,2))
-                t = t[j]  # filter (19, 7)，表示这一层匹配到的anchor
+                t = t[j]  # 表示这一层匹配到的anchor
 
                 # Offsets
                 gxy = t[:, 2:4]  # grid xy
