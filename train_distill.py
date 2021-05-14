@@ -314,14 +314,15 @@ def train(hyp, opt, device, tb_writer=None):
                         imgs, opt.img_size)
                     loss, loss_items = compute_distill_loss(
                         pred, t_targets, nc, opt.distill_ratio,
-                        opt.temperature, opt.soft_loss)
+                        opt.temperature, opt.KL_loss)
                     pred_num = 0
                 else:
                     t_targets, _ = teacher_model.generate_batch_targets(
                         imgs, opt.img_size)
-                    loss, loss_items = compute_distill_loss(pred, t_targets.to(device), opt.soft_loss)
+                    loss, loss_items = compute_distill_loss(
+                        pred, t_targets.to(device), opt.KL_loss)
                     pred_num = t_targets.shape[0]
-                    
+
                 if opt.with_gt_loss:
                     gt_loss, gt_loss_items = compute_loss(
                         pred, targets.to(device))
@@ -354,7 +355,7 @@ def train(hyp, opt, device, tb_writer=None):
                 s = ('%10s' * 2 + '%10.4g' * 7) % (
                     '%g/%g' % (epoch, epochs - 1), mem, *mloss, pred_num, imgs.shape[-1])
                 pbar.set_description(s)
-
+            break
             # end batch ------------------------------------------------------------------------------------------------
         # end epoch ----------------------------------------------------------------------------------------------------
 
@@ -392,7 +393,7 @@ def train(hyp, opt, device, tb_writer=None):
                           (results_file, opt.bucket, opt.name))
 
             # Log
-            tags = ['train/box_loss', 'train/obj_loss', 'train/cls_loss', 'train/soft_loss',  # train loss
+            tags = ['train/box_loss', 'train/obj_loss', 'train/cls_loss', 'train/KL_loss',  # train loss
                     'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/mAP_0.5:0.95',
                     'val/box_loss', 'val/obj_loss', 'val/cls_loss',  # val loss
                     'x/lr0', 'x/lr1', 'x/lr2']  # params
