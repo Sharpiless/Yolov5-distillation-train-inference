@@ -76,34 +76,35 @@ class TeacherModel(object):
 
     def generate_batch_targets(self, imgs, tar_size=[640, 640]):
         targets = []
-        if self.training:
-            preds = self.model(imgs)
-        else:
-            preds = self.model(imgs)[0]
+        with torch.no_grad():
+            if self.training:
+                preds = self.model(imgs)
+            else:
+                preds = self.model(imgs)[0]
         if not self.training:
-            with torch.no_grad():
-                for img_id in range(imgs.shape[0]):
 
-                    pred = preds[img_id:img_id+1]                
-                    pred = non_max_suppression(
-                        pred, self.conf_thres, self.iou_thres, distill=True, agnostic=False)
+            for img_id in range(imgs.shape[0]):
 
-                    for det in pred:  # detections per image
-                        gn = torch.tensor(tar_size)[[1, 0, 1, 0]]
-                        if len(det):
-                            # Rescale boxes from img_size to img0 size
-                            det[:, :4] = scale_coords(
-                                imgs[img_id].unsqueeze(0).shape[2:], det[:, :4], tar_size).round()
+                pred = preds[img_id:img_id+1]
+                pred = non_max_suppression(
+                    pred, self.conf_thres, self.iou_thres, distill=True, agnostic=False)
 
-                            for value in reversed(det):
-                                xyxy, cls_id = value[:4], value[5]
-                                logits = value[-self.nc:].tolist()
-                                xywh = (xyxy2xywh(torch.tensor(xyxy.cpu()).view(1, 4)
-                                                ) / gn).view(-1).tolist()  # normalized xywh
-                                line = [img_id, int(cls_id)]
-                                line.extend(xywh)
-                                line.extend(logits)
-                                targets.append(line)
+                for det in pred:  # detections per image
+                    gn = torch.tensor(tar_size)[[1, 0, 1, 0]]
+                    if len(det):
+                        # Rescale boxes from img_size to img0 size
+                        det[:, :4] = scale_coords(
+                            imgs[img_id].unsqueeze(0).shape[2:], det[:, :4], tar_size).round()
+
+                        for value in reversed(det):
+                            xyxy, cls_id = value[:4], value[5]
+                            logits = value[-self.nc:].tolist()
+                            xywh = (xyxy2xywh(torch.tensor(xyxy.cpu()).view(1, 4)
+                                              ) / gn).view(-1).tolist()  # normalized xywh
+                            line = [img_id, int(cls_id)]
+                            line.extend(xywh)
+                            line.extend(logits)
+                            targets.append(line)
 
             return torch.tensor(np.array(targets), dtype=torch.float32), None
         else:
@@ -126,4 +127,3 @@ if __name__ == '__main__':
 
     imgs = torch.rand((2, 3, 640, 640)).to(teacher.device)
     targets = teacher.generate_batch_targets(imgs)
-    

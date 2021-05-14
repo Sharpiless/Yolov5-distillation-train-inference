@@ -83,6 +83,12 @@ def train(hyp, opt, device, tb_writer=None):
     assert len(names) == nc, '%g names found for nc=%g dataset in %s' % (
         len(names), nc, opt.data)  # check
 
+    # Log
+    tags = ['train/box_loss', 'train/obj_loss', 'train/cls_loss', 'train/KL_loss',  # train loss
+            'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/mAP_0.5:0.95',
+            'val/box_loss', 'val/obj_loss', 'val/cls_loss',  # val loss
+            'x/lr0', 'x/lr1', 'x/lr2']  # params
+
     # Model
     pretrained = weights.endswith('.pt')
     if pretrained:
@@ -392,11 +398,6 @@ def train(hyp, opt, device, tb_writer=None):
                 os.system('gsutil cp %s gs://%s/results/results%s.txt' %
                           (results_file, opt.bucket, opt.name))
 
-            # Log
-            tags = ['train/box_loss', 'train/obj_loss', 'train/cls_loss', 'train/KL_loss',  # train loss
-                    'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/mAP_0.5:0.95',
-                    'val/box_loss', 'val/obj_loss', 'val/cls_loss',  # val loss
-                    'x/lr0', 'x/lr1', 'x/lr2']  # params
             for x, tag in zip(list(mloss[:-1]) + list(results) + lr, tags):
                 if tb_writer:
                     tb_writer.add_scalar(tag, x, epoch)  # tensorboard
@@ -619,7 +620,6 @@ if __name__ == '__main__':
                 f"{prefix}Start with 'tensorboard --logdir {opt.project}', view at http://localhost:6006/")
             tb_writer = SummaryWriter(opt.save_dir)  # Tensorboard
         train(hyp, opt, device, tb_writer)
-
     # Evolve hyperparameters (optional)
     else:
         # Hyperparameter evolution metadata (mutation scale 0-1, lower_limit, upper_limit)
