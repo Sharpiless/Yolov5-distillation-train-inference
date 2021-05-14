@@ -18,7 +18,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-import test  # import test.py to get mAP after each epoch
+import test
 from models.experimental import attempt_load
 from models.yolo import Model
 from utils.datasets import create_dataloader
@@ -582,7 +582,6 @@ if __name__ == '__main__':
             '', ckpt, True, opt.total_batch_size, *apriori  # reinstate
         logger.info('Resuming training from %s' % ckpt)
     else:
-        # opt.hyp = opt.hyp or ('hyp.finetune.yaml' if opt.weights else 'hyp.scratch.yaml')
         opt.data, opt.cfg, opt.hyp = check_file(opt.data), check_file(
             opt.cfg), check_file(opt.hyp)  # check files
         assert len(opt.cfg) or len(
