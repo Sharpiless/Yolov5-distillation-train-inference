@@ -483,8 +483,6 @@ if __name__ == '__main__':
                         default='weights/yolov5s.pt', help='initial weights path')
     parser.add_argument('--teacher', type=str,
                         default='weights/yolov5l.pt', help='teacher weights path')
-    parser.add_argument('--without-cls-loss', action='store_true',
-                        help='using only distill logits loss in total loss')
     parser.add_argument('--KL-loss', action='store_true',
                         help='using KL distill loss rather than l2 loss')
     parser.add_argument('--distill-ratio', type=float,
