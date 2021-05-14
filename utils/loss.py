@@ -304,8 +304,8 @@ class ComputeOutbasedDstillLoss:
         t_lobj *= dhyp['obj'] * self.distill_ratio
         t_lcls *= dhyp['cls'] * self.distill_ratio
         bs = p[0].shape[0]  # batch size
-        loss = (t_lobj + t_lbox + t_lcls + t_lsoft) * bs
-        return loss, torch.cat((t_lbox, t_lobj, t_lcls, t_lsoft, loss)).detach()
+        loss = t_lobj + t_lbox + t_lcls + t_lsoft
+        return loss * bs, torch.cat((t_lbox, t_lobj, t_lcls, t_lsoft, loss)).detach()
 
 
 class ComputeDstillLoss:
