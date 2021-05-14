@@ -272,6 +272,7 @@ class ComputeOutbasedDstillLoss:
         self.DboxLoss = nn.MSELoss(reduction="none")
         self.DclsLoss = nn.MSELoss(reduction="none")
         self.DobjLoss = nn.MSELoss(reduction="none")
+        self.DsoftLoss = nn.KLDivLoss(reduction="none")
 
     def __call__(self, p, t_p, soft_loss='kl'):
         t_ft = torch.cuda.FloatTensor if t_p[0].is_cuda else torch.Tensor
@@ -292,8 +293,10 @@ class ComputeOutbasedDstillLoss:
                 c_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1,
                                                                1, 1, 1, self.nc)
                 if soft_loss == 'kl' or soft_loss == 'mix':
-                    t_lsoft += nn.KLDivLoss()(F.log_softmax(pi[..., 5:]/self.T, dim=-1),
+                    kl_loss = self.DsoftLoss(F.log_softmax(pi[..., 5:]/self.T, dim=-1),
                                              F.softmax(t_pi[..., 5:]/self.T, dim=-1)) * (self.T * self.T)
+                    kl_loss = torch.mean(kl_loss, dim=-1)
+                    t_lsoft += torch.mean(kl_loss * t_obj_scale)
                 elif soft_loss == 'l2' or soft_loss == 'mix':
                     t_lsoft += torch.mean(self.DclsLoss(pi[..., 5:],
                                                        t_pi[..., 5:]) * c_obj_scale)
