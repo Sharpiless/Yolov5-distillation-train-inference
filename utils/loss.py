@@ -275,7 +275,8 @@ class ComputeOutbasedDstillLoss:
 
     def __call__(self, p, t_p, soft_loss='kl'):
         t_ft = torch.cuda.FloatTensor if t_p[0].is_cuda else torch.Tensor
-        t_lcls, t_lbox, t_lobj = t_ft([0]), t_ft([0]), t_ft([0])
+        t_lbox, t_lobj = t_ft([0]), t_ft([0])
+        t_lcls, t_lsoft = t_ft([0]), t_ft([0])
 
         for i, pi in enumerate(p):  # layer index, layer predictions
             t_pi = t_p[i]
@@ -291,10 +292,10 @@ class ComputeOutbasedDstillLoss:
                 c_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1,
                                                                1, 1, 1, self.nc)
                 if soft_loss == 'kl' or soft_loss == 'mix':
-                    t_lcls += nn.KLDivLoss()(F.log_softmax(pi[..., 5:]/self.T, dim=-1),
+                    t_lsoft += nn.KLDivLoss()(F.log_softmax(pi[..., 5:]/self.T, dim=-1),
                                              F.softmax(t_pi[..., 5:]/self.T, dim=-1)) * (self.T * self.T)
                 elif soft_loss == 'l2' or soft_loss == 'mix':
-                    t_lcls += torch.mean(self.DclsLoss(pi[..., 5:],
+                    t_lsoft += torch.mean(self.DclsLoss(pi[..., 5:],
                                                        t_pi[..., 5:]) * c_obj_scale)
 
             t_lobj += torch.mean(self.DobjLoss(pi[..., 4],
@@ -304,7 +305,7 @@ class ComputeOutbasedDstillLoss:
         t_lcls *= dhyp['cls'] * self.distill_ratio
         bs = p[0].shape[0]  # batch size
         loss = (t_lobj + t_lbox + t_lcls) * bs
-        return loss, torch.cat((t_lbox, t_lobj, t_lcls, t_lcls, loss)).detach()
+        return loss, torch.cat((t_lbox, t_lobj, t_lcls, t_lsoft, loss)).detach()
 
 
 class ComputeDstillLoss:

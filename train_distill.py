@@ -281,7 +281,8 @@ def train(hyp, opt, device, tb_writer=None):
                 f'Logging results to {save_dir}\n'
                 f'Starting training for {epochs} epochs...')
     # epoch ------------------------------------------------------------------
-    assert opt.soft_loss in ['kl', 'l2', 'mix']
+    assert opt.soft_loss in [
+        'kl', 'l2', 'mix'], 'ERROR: --soft-loss must be one of [kl, l2, mix]'
     for epoch in range(start_epoch, epochs):
         model.train()
 
