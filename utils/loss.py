@@ -386,13 +386,10 @@ class ComputeDstillLoss:
                         ps[:, 5:], self.cn, device=device)  # targets
                     t[range(n), tcls[i]] = self.cp
                     lcls += self.BCEcls(ps[:, 5:], t)  # BCE
-                    td = torch.full_like(
-                        tlogits[i], self.cn, device=device)  # targets
-                    td[range(n)] = tlogits[i]
                     if soft_loss:
-                        lsoft += self.KlSoftmaxLoss(ps[:, 5:], td)
+                        lsoft += self.KlSoftmaxLoss(ps[:, 5:], tlogits[i])
                     else:
-                        lsoft += self.L2Logits(ps[:, 5:], td)
+                        lsoft += self.L2Logits(ps[:, 5:], tlogits[i])
 
             obji = self.BCEobj(pi[..., 4], tobj)
             lobj += obji * self.balance[i]  # obj loss
