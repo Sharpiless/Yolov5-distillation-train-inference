@@ -263,45 +263,48 @@ class ComputeLoss:
         return tcls, tbox, indices, anch
 
 
-def compute_distillation_output_loss(p, t_p, nc, distill_ratio, T=10, soft_loss=False):
-    t_ft = torch.cuda.FloatTensor if t_p[0].is_cuda else torch.Tensor
-    t_lcls, t_lbox, t_lobj = t_ft([0]), t_ft([0]), t_ft([0])
-    red = 'mean'  # Loss reduction (sum or mean)
-    if red != "mean":
-        raise NotImplementedError(
-            "reduction must be mean in distillation mode!")
+class ComputeOutbasedDstillLoss:
+    def __init__(self, nc, distill_ratio=0.5, temperature=10):
+        super(ComputeOutbasedDstillLoss, self).__init__()
+        self.distill_ratio = distill_ratio
+        self.T = temperature
+        self.nc = nc
+        self.DboxLoss = nn.MSELoss(reduction="none")
+        self.DclsLoss = nn.MSELoss(reduction="none")
+        self.DobjLoss = nn.MSELoss(reduction="none")
 
-    DboxLoss = nn.MSELoss(reduction="none")
-    DclsLoss = nn.MSELoss(reduction="none")
-    DobjLoss = nn.MSELoss(reduction="none")
-    # per output
-    for i, pi in enumerate(p):  # layer index, layer predictions
-        t_pi = t_p[i]
-        t_obj_scale = t_pi[..., 4].sigmoid()
+    def __call__(self, p, t_p, soft_loss=False):
+        t_ft = torch.cuda.FloatTensor if t_p[0].is_cuda else torch.Tensor
+        t_lcls, t_lbox, t_lobj = t_ft([0]), t_ft([0]), t_ft([0])
 
-        # BBox
-        b_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1, 1, 1, 1, 4)
-        t_lbox += torch.mean(DboxLoss(pi[..., :4],
-                             t_pi[..., :4]) * b_obj_scale)
+        for i, pi in enumerate(p):  # layer index, layer predictions
+            t_pi = t_p[i]
+            t_obj_scale = t_pi[..., 4].sigmoid()
 
-        # Class
-        if nc > 1:  # cls loss (only if multiple classes)
-            c_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1,
-                                                           1, 1, 1, nc)
-            if soft_loss:
-                t_lcls += nn.KLDivLoss()(F.log_softmax(pi[..., 5:]/T, dim=-1),
-                                         F.softmax(t_pi[..., 5:]/T, dim=-1)) * (T * T)
-            else:
-                t_lcls += torch.mean(DclsLoss(pi[..., 5:],
-                                    t_pi[..., 5:]) * c_obj_scale)
+            # BBox
+            b_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1, 1, 1, 1, 4)
+            t_lbox += torch.mean(self.DboxLoss(pi[..., :4],
+                                               t_pi[..., :4]) * b_obj_scale)
 
-        t_lobj += torch.mean(DobjLoss(pi[..., 4], t_pi[..., 4]) * t_obj_scale)
-    t_lbox *= dhyp['giou'] * distill_ratio
-    t_lobj *= dhyp['obj'] * distill_ratio
-    t_lcls *= dhyp['cls'] * distill_ratio
-    bs = p[0].shape[0]  # batch size
-    loss = (t_lobj + t_lbox + t_lcls) * bs
-    return loss, torch.cat((t_lbox, t_lobj, t_lcls, t_lcls, loss)).detach()
+            # Class
+            if self.nc > 1:  # cls loss (only if multiple classes)
+                c_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1,
+                                                               1, 1, 1, self.nc)
+                if soft_loss:
+                    t_lcls += nn.KLDivLoss()(F.log_softmax(pi[..., 5:]/self.T, dim=-1),
+                                             F.softmax(t_pi[..., 5:]/self.T, dim=-1)) * (self.T * self.T)
+                else:
+                    t_lcls += torch.mean(self.DclsLoss(pi[..., 5:],
+                                                       t_pi[..., 5:]) * c_obj_scale)
+
+            t_lobj += torch.mean(self.DobjLoss(pi[..., 4],
+                                 t_pi[..., 4]) * t_obj_scale)
+        t_lbox *= dhyp['giou'] * self.distill_ratio
+        t_lobj *= dhyp['obj'] * self.distill_ratio
+        t_lcls *= dhyp['cls'] * self.distill_ratio
+        bs = p[0].shape[0]  # batch size
+        loss = (t_lobj + t_lbox + t_lcls) * bs
+        return loss, torch.cat((t_lbox, t_lobj, t_lcls, t_lcls, loss)).detach()
 
 
 class ComputeDstillLoss:
@@ -319,6 +322,7 @@ class ComputeDstillLoss:
             pos_weight=torch.tensor([h['obj_pw']], device=device))
         self.L2Logits = nn.MSELoss()
         self.KLDistillLoss = nn.KLDivLoss()
+        # self.BCEDistillLoss = nn.BCEWithLogitsLoss()
         # positive, negative BCE targets
         self.cp, self.cn = smooth_BCE(eps=h.get('label_smoothing', 0.0))
 
@@ -346,7 +350,7 @@ class ComputeDstillLoss:
         """
         T = self.T
         KD_loss = self.KLDistillLoss(F.log_softmax(student_var/T, dim=-1),
-                                 F.softmax(teacher_var/T, dim=-1)) * (T * T)
+                                     F.softmax(teacher_var/T, dim=-1)) * (T * T)
 
         return KD_loss
 
@@ -388,6 +392,8 @@ class ComputeDstillLoss:
                     lcls += self.BCEcls(ps[:, 5:], t)  # BCE
                     if soft_loss:
                         lsoft += self.KlSoftmaxLoss(ps[:, 5:], tlogits[i])
+                        # lsoft += self.BCEDistillLoss(ps[:, 5:],
+                        #                              tlogits[i].sigmoid())
                     else:
                         lsoft += self.L2Logits(ps[:, 5:], tlogits[i])
 

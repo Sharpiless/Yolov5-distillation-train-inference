@@ -28,7 +28,7 @@ from utils.general import increment_path, init_seeds, \
     check_file, check_img_size, \
     check_requirements, print_mutation, set_logging, one_cycle, colorstr
 from utils.google_utils import attempt_download
-from utils.loss import ComputeLoss, ComputeDstillLoss, compute_distillation_output_loss
+from utils.loss import ComputeLoss, ComputeDstillLoss, ComputeOutbasedDstillLoss
 from utils.plots import plot_results, plot_evolution
 from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_distributed_zero_first, is_parallel
 from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
@@ -271,7 +271,8 @@ def train(hyp, opt, device, tb_writer=None):
     scaler = amp.GradScaler(enabled=cuda)
     compute_loss = ComputeLoss(model)  # init loss class
     if opt.full_output_loss:
-        compute_distill_loss = compute_distillation_output_loss
+        compute_distill_loss = ComputeOutbasedDstillLoss(
+            nc=nc, distill_ratio=opt.distill_ratio, temperature=opt.temperature)
     else:
         compute_distill_loss = ComputeDstillLoss(
             model, distill_ratio=opt.distill_ratio, temperature=opt.temperature)
@@ -318,16 +319,15 @@ def train(hyp, opt, device, tb_writer=None):
                 if opt.full_output_loss:
                     _, t_targets = teacher_model.generate_batch_targets(
                         imgs, opt.img_size)
-                    loss, loss_items = compute_distill_loss(
-                        pred, t_targets, nc, opt.distill_ratio,
-                        opt.temperature, opt.KL_loss)
                     pred_num = 0
                 else:
                     t_targets, _ = teacher_model.generate_batch_targets(
                         imgs, opt.img_size)
-                    loss, loss_items = compute_distill_loss(
-                        pred, t_targets.to(device), opt.KL_loss)
+                    t_targets = t_targets.to(device)
                     pred_num = t_targets.shape[0]
+
+                loss, loss_items = compute_distill_loss(
+                    pred, t_targets, opt.KL_loss)
 
                 if opt.with_gt_loss:
                     gt_loss, gt_loss_items = compute_loss(
