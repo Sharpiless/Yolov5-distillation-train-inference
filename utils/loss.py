@@ -273,7 +273,7 @@ class ComputeOutbasedDstillLoss:
         self.DclsLoss = nn.MSELoss(reduction="none")
         self.DobjLoss = nn.MSELoss(reduction="none")
 
-    def __call__(self, p, t_p, soft_loss=False):
+    def __call__(self, p, t_p, soft_loss='kl'):
         t_ft = torch.cuda.FloatTensor if t_p[0].is_cuda else torch.Tensor
         t_lcls, t_lbox, t_lobj = t_ft([0]), t_ft([0]), t_ft([0])
 
@@ -290,10 +290,10 @@ class ComputeOutbasedDstillLoss:
             if self.nc > 1:  # cls loss (only if multiple classes)
                 c_obj_scale = t_obj_scale.unsqueeze(-1).repeat(1,
                                                                1, 1, 1, self.nc)
-                if soft_loss:
+                if soft_loss == 'kl' or soft_loss == 'mix':
                     t_lcls += nn.KLDivLoss()(F.log_softmax(pi[..., 5:]/self.T, dim=-1),
                                              F.softmax(t_pi[..., 5:]/self.T, dim=-1)) * (self.T * self.T)
-                else:
+                elif soft_loss == 'l2' or soft_loss == 'mix':
                     t_lcls += torch.mean(self.DclsLoss(pi[..., 5:],
                                                        t_pi[..., 5:]) * c_obj_scale)
 
@@ -355,7 +355,7 @@ class ComputeDstillLoss:
         return KD_loss
 
     # predictions, targets, model
-    def __call__(self, p, targets, soft_loss=False):
+    def __call__(self, p, targets, soft_loss='kl'):
         device = targets.device
         lcls, lbox, lobj, lsoft = torch.zeros(1, device=device), torch.zeros(
             1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device)
@@ -390,11 +390,9 @@ class ComputeDstillLoss:
                         ps[:, 5:], self.cn, device=device)  # targets
                     t[range(n), tcls[i]] = self.cp
                     lcls += self.BCEcls(ps[:, 5:], t)  # BCE
-                    if soft_loss:
+                    if soft_loss == 'kl' or soft_loss == 'mix':
                         lsoft += self.KlSoftmaxLoss(ps[:, 5:], tlogits[i])
-                        # lsoft += self.BCEDistillLoss(ps[:, 5:],
-                        #                              tlogits[i].sigmoid())
-                    else:
+                    if soft_loss == 'l2' or soft_loss == 'mix':
                         lsoft += self.L2Logits(ps[:, 5:], tlogits[i])
 
             obji = self.BCEobj(pi[..., 4], tobj)

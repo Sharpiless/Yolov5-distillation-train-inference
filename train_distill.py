@@ -84,7 +84,7 @@ def train(hyp, opt, device, tb_writer=None):
         len(names), nc, opt.data)  # check
 
     # Log
-    tags = ['train/box_loss', 'train/obj_loss', 'train/cls_loss', 'train/KL_loss',  # train loss
+    tags = ['train/box_loss', 'train/obj_loss', 'train/cls_loss', 'train/soft_loss',  # train loss
             'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/mAP_0.5:0.95',
             'val/box_loss', 'val/obj_loss', 'val/cls_loss',  # val loss
             'x/lr0', 'x/lr1', 'x/lr2']  # params
@@ -281,6 +281,7 @@ def train(hyp, opt, device, tb_writer=None):
                 f'Logging results to {save_dir}\n'
                 f'Starting training for {epochs} epochs...')
     # epoch ------------------------------------------------------------------
+    assert opt.soft_loss in ['kl', 'l2', 'mix']
     for epoch in range(start_epoch, epochs):
         model.train()
 
@@ -327,7 +328,7 @@ def train(hyp, opt, device, tb_writer=None):
                     pred_num = t_targets.shape[0]
 
                 loss, loss_items = compute_distill_loss(
-                    pred, t_targets, opt.KL_loss)
+                    pred, t_targets, opt.soft_loss)
 
                 if opt.with_gt_loss:
                     gt_loss, gt_loss_items = compute_loss(
@@ -484,8 +485,8 @@ if __name__ == '__main__':
                         default='weights/yolov5s.pt', help='initial weights path')
     parser.add_argument('--teacher', type=str,
                         default='weights/yolov5l.pt', help='teacher weights path')
-    parser.add_argument('--KL-loss', action='store_true',
-                        help='using KL distill loss rather than l2 loss')
+    parser.add_argument('--soft-loss', default='kl',
+                        help='using KL distill loss、l2 loss or mix loss')
     parser.add_argument('--distill-ratio', type=float,
                         default=0.5, help='distill loss ratio in total loss')
     parser.add_argument('--t_conf_thres', type=float,

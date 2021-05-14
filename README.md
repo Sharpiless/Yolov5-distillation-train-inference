@@ -32,7 +32,7 @@ python train_distill.py --weights yolov5s.pt \
 
 > --with-gt-loss：是否同时使用ground truth
 
-> --KL-loss：是否使用KL散度作为蒸馏的类别损失（缺省使用L2-logits损失）
+> --soft-loss：是否使用KL散度作为蒸馏的类别损失（缺省使用L2-logits损失）
 
 > --full-output-loss：是否使用[《Object detection at 200 Frames Per Second》](https://arxiv.org/pdf/1805.06361.pdf)中的损失
 
