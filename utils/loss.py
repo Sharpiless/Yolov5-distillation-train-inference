@@ -296,8 +296,7 @@ class ComputeOutbasedDstillLoss:
                 if soft_loss == 'kl':
                     kl_loss = self.DsoftLoss(F.log_softmax(pi[..., 5:]/self.T, dim=-1),
                                              F.softmax(t_pi[..., 5:]/self.T, dim=-1)) * (self.T * self.T)
-                    kl_loss = torch.sum(kl_loss, dim=-1)
-                    t_lsoft += torch.mean(kl_loss * t_obj_scale)
+                    t_lsoft += torch.mean(kl_loss * c_obj_scale)
                 elif soft_loss == 'l2':
                     t_lsoft += torch.mean(self.DclsLoss(pi[..., 5:],
                                                         t_pi[..., 5:]) * c_obj_scale)
