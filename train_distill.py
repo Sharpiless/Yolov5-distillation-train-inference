@@ -117,7 +117,7 @@ def train(hyp, opt, device, tb_writer=None):
         opt.teacher), '-[ERROR] tearcher weights do not exists.'
     teacher_model = TeacherModel(
         conf_thres=opt.t_conf_thres, iou_thres=opt.t_nms_thres, training=opt.full_output_loss)
-    teacher_model.init_model(opt.teacher, opt.device, batch_size, nc)
+    teacher_model.init_model(opt.teacher, opt.device, nc)
 
     # Freeze
     freeze = []  # parameter names to freeze (full or partial)
@@ -472,7 +472,7 @@ if __name__ == '__main__':
     parser.add_argument('--weights', type=str,
                         default='weights/yolov5s.pt', help='initial weights path')
     parser.add_argument('--teacher', type=str,
-                        default='weights/yolov5l.pt', help='teacher weights path')
+                        default='weights/yolov5m-voc.pt', help='teacher weights path')
     parser.add_argument('--distill-ratio', type=float,
                         default=0.5, help='distill loss ratio in total loss')
     parser.add_argument('--t_conf_thres', type=float,
@@ -488,7 +488,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--hyp', type=str, default='data/hyp_distill.scratch.yaml', help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=30)
-    parser.add_argument('--batch-size', type=int, default=4,
+    parser.add_argument('--batch-size', type=int, default=2,
                         help='total batch size for all GPUs')
     parser.add_argument('--img-size', nargs='+', type=int,
                         default=[640, 640], help='[train, test] image sizes')

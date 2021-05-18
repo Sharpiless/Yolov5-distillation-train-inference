@@ -316,7 +316,6 @@ class ComputeDstillLoss:
         BCEobj = nn.BCEWithLogitsLoss(
             pos_weight=torch.tensor([h['obj_pw']], device=device))
         self.L2Logits = nn.MSELoss()
-        self.KLDistillLoss = nn.KLDivLoss()
         # self.BCEDistillLoss = nn.BCEWithLogitsLoss()
         # positive, negative BCE targets
         self.cp, self.cn = smooth_BCE(eps=h.get('label_smoothing', 0.0))

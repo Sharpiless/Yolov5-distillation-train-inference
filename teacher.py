@@ -1,9 +1,8 @@
 from utils.torch_utils import select_device
 from utils.general import non_max_suppression, scale_coords, xyxy2xywh
-
 import numpy as np
 import torch
-
+from utils.torch_utils import select_device
 
 class TeacherModel(object):
     def __init__(self, conf_thres=0.5, iou_thres=0.3, imgsz=640, training=False):
@@ -14,7 +13,8 @@ class TeacherModel(object):
         self.imgsz = imgsz
         self.training = training
 
-    def init_model(self, weights, device, batch_size, nc):
+    def init_model(self, weights, device, nc):
+        device = select_device(device)
         t_model = torch.load(weights, map_location=torch.device('cpu'))
         if t_model.get("model", None) is not None:
             t_model = t_model["model"]
