@@ -67,12 +67,16 @@ Teacher model：Yolov5l（mAP 0.5:0.95 = 0.541）
 
 这里假设VOC2012中新增加的数据为无标签数据（2k张）。
 
-| 原模型     | 教师模型    | VOC2007 | VOC2012 | mAP 0.5:0.95 |
-|---------|---------|---------|---------|--------------|
-| Yolov5s | 无       | 原始标签    | 不使用     | 0.487        |
-| Yolov5s | Yolov5l | 蒸馏训练    | 不使用     | 0.449        |
-| Yolov5s | Yolov5l | 蒸馏训练    | 蒸馏训练    | 暂无         |
-| Yolov5s | Yolov5l | 原始标签    | 蒸馏训练    | 0.486        |
+|教师模型|训练方法|蒸馏损失|P|R|mAP50|
+|:----|:----|:----|:----|:----|:----|
+|无|正常训练|不使用|0.7756|0.7115|0.7609|
+|Yolov5l|output based|l2|0.7585|0.7198|0.7644|
+|Yolov5l|output based|KL|0.7417|0.7207|0.7536|
+|Yolov5m|output based|l2|0.7682|0.7436|0.7976|
+|Yolov5m|output based|KL|0.7731|0.7313|0.7931|
+
+![训练结果](https://github.com/Sharpiless/yolov5-distillation-5.0/blob/main/images/line.png)
+
 
 参数和细节正在完善，支持KL散度、L2 logits损失和Sigmoid蒸馏损失等
 
