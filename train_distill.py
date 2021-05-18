@@ -22,7 +22,6 @@ import test
 from models.experimental import attempt_load
 from models.yolo import Model
 from utils.datasets import create_dataloader
-from utils.datasets_still import create_dataloader as create_train_dataloader
 from utils.general import increment_path, init_seeds, \
     fitness, strip_optimizer, get_latest_run, check_dataset, \
     check_file, check_img_size, \
@@ -118,7 +117,8 @@ def train(hyp, opt, device, tb_writer=None):
         opt.teacher), '-[ERROR] tearcher weights do not exists.'
     teacher_model = TeacherModel(
         conf_thres=opt.t_conf_thres, iou_thres=opt.t_nms_thres, training=opt.full_output_loss)
-    teacher_model.init_model(opt.teacher, opt.device, 1, nc, opt.teacher_cfg)
+    teacher_model.init_model(opt.teacher, opt.device,
+                             batch_size, nc, opt.teacher_cfg)
 
     # Freeze
     freeze = []  # parameter names to freeze (full or partial)
@@ -230,16 +230,10 @@ def train(hyp, opt, device, tb_writer=None):
             model.half().float()  # pre-reduce anchor precision
 
     # Trainloader
-    if opt.with_gt_loss:
-        dataloader, _ = create_dataloader(train_path, imgsz, batch_size, gs, opt,
-                                          hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
-                                          world_size=opt.world_size, workers=opt.workers,
-                                          image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
-    else:
-        dataloader, _ = create_train_dataloader(train_path, imgsz, batch_size, gs, opt,
-                                                hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
-                                                world_size=opt.world_size, workers=opt.workers,
-                                                image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
+    dataloader, _ = create_dataloader(train_path, imgsz, batch_size, gs, opt,
+                                      hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
+                                      world_size=opt.world_size, workers=opt.workers,
+                                      image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
     nb = len(dataloader)  # number of batches
 
     # DDP mode
@@ -280,9 +274,7 @@ def train(hyp, opt, device, tb_writer=None):
                 f'Using {dataloader.num_workers} dataloader workers\n'
                 f'Logging results to {save_dir}\n'
                 f'Starting training for {epochs} epochs...')
-    # epoch ------------------------------------------------------------------
-    assert opt.soft_loss in [
-        'kl', 'l2'], 'ERROR: --soft-loss must be one of [kl, l2]'
+
     for epoch in range(start_epoch, epochs):
         model.train()
 
@@ -321,22 +313,18 @@ def train(hyp, opt, device, tb_writer=None):
                 if opt.full_output_loss:
                     _, t_targets = teacher_model.generate_batch_targets(
                         imgs, opt.img_size)
-                    pred_num = 0
                 else:
                     t_targets, _ = teacher_model.generate_batch_targets(
                         imgs, opt.img_size)
                     t_targets = t_targets.to(device)
-                    pred_num = t_targets.shape[0]
 
-                loss, loss_items = compute_distill_loss(
-                    pred, t_targets, opt.soft_loss)
+                loss, loss_items = compute_distill_loss(pred, t_targets)
 
-                if opt.with_gt_loss:
-                    gt_loss, gt_loss_items = compute_loss(
-                        pred, targets.to(device))
-                    loss += gt_loss
-                    loss_items += gt_loss_items
-                    pred_num = targets.shape[0]
+                gt_loss, gt_loss_items = compute_loss(
+                    pred, targets.to(device))
+                loss += gt_loss
+                loss_items += gt_loss_items
+                pred_num = targets.shape[0]
 
                 if rank != -1:
                     loss *= opt.world_size  # gradient averaged between devices in DDP mode
@@ -486,8 +474,6 @@ if __name__ == '__main__':
                         default='weights/yolov5s.pt', help='initial weights path')
     parser.add_argument('--teacher', type=str,
                         default='weights/yolov5l.pt', help='teacher weights path')
-    parser.add_argument('--soft-loss', default='kl',
-                        help='using KL distill loss or l2 loss')
     parser.add_argument('--distill-ratio', type=float,
                         default=0.5, help='distill loss ratio in total loss')
     parser.add_argument('--t_conf_thres', type=float,
