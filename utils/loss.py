@@ -264,10 +264,9 @@ class ComputeLoss:
 
 
 class ComputeOutbasedDstillLoss:
-    def __init__(self, nc, distill_ratio=0.5, temperature=10):
+    def __init__(self, nc, distill_ratio=0.5):
         super(ComputeOutbasedDstillLoss, self).__init__()
         self.distill_ratio = distill_ratio
-        self.T = temperature
         self.nc = nc
         self.DboxLoss = nn.MSELoss(reduction="none")
         self.DclsLoss = nn.MSELoss(reduction="none")
@@ -306,12 +305,11 @@ class ComputeOutbasedDstillLoss:
 
 class ComputeDstillLoss:
     # Compute losses
-    def __init__(self, model, autobalance=False, distill_ratio=0.5, temperature=10):
+    def __init__(self, model, autobalance=False, distill_ratio=0.5):
         super(ComputeDstillLoss, self).__init__()
         device = next(model.parameters()).device  # get model device
         h = model.hyp  # hyperparameters
         self.distill_ratio = distill_ratio
-        self.T = temperature
         # Define criteria
         BCEcls = nn.BCEWithLogitsLoss(
             pos_weight=torch.tensor([h['cls_pw']], device=device))

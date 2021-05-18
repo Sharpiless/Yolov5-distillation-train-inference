@@ -117,8 +117,7 @@ def train(hyp, opt, device, tb_writer=None):
         opt.teacher), '-[ERROR] tearcher weights do not exists.'
     teacher_model = TeacherModel(
         conf_thres=opt.t_conf_thres, iou_thres=opt.t_nms_thres, training=opt.full_output_loss)
-    teacher_model.init_model(opt.teacher, opt.device,
-                             batch_size, nc, opt.teacher_cfg)
+    teacher_model.init_model(opt.teacher, opt.device, batch_size, nc)
 
     # Freeze
     freeze = []  # parameter names to freeze (full or partial)
@@ -266,10 +265,10 @@ def train(hyp, opt, device, tb_writer=None):
     compute_loss = ComputeLoss(model)  # init loss class
     if opt.full_output_loss:
         compute_distill_loss = ComputeOutbasedDstillLoss(
-            nc=nc, distill_ratio=opt.distill_ratio, temperature=opt.temperature)
+            nc=nc, distill_ratio=opt.distill_ratio)
     else:
         compute_distill_loss = ComputeDstillLoss(
-            model, distill_ratio=opt.distill_ratio, temperature=opt.temperature)
+            model, distill_ratio=opt.distill_ratio)
     logger.info(f'Image sizes {imgsz} train, {imgsz_test} test\n'
                 f'Using {dataloader.num_workers} dataloader workers\n'
                 f'Logging results to {save_dir}\n'
@@ -482,14 +481,8 @@ if __name__ == '__main__':
                         default=0.3, help='teacher nms iou threshold')
     parser.add_argument('--full-output-loss',
                         action='store_true', help='use full output to compute distill loss')
-    parser.add_argument('--with-gt-loss',
-                        action='store_true', help='use ground truth to compute distill loss')
-    parser.add_argument('--temperature', type=float,
-                        default=10.0, help='temperature in soft softmax distillation loss')
     parser.add_argument('--cfg', type=str,
                         default='models/yolov5s.yaml', help='model.yaml path')
-    parser.add_argument('--teacher-cfg', type=str,
-                        default='models/yolov5l.yaml', help='teacher model.yaml path')
     parser.add_argument('--data', type=str,
                         default='data/voc.yaml', help='data.yaml path')
     parser.add_argument(
