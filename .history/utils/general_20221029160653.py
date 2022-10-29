@@ -24,7 +24,7 @@ import pkg_resources as pkg
 from utils.google_utils import gsutil_getsize
 from utils.metrics import fitness
 from utils.torch_utils import init_torch_seeds
-logger = logging.getLogger(__name__)
+
 # Settings
 torch.set_printoptions(linewidth=320, precision=5, profile='long')
 np.set_printoptions(linewidth=320, formatter={'float_kind': '{:11.5g}'.format})  # format short g, %precision=5
@@ -57,7 +57,7 @@ def check_version(current='0.0.0', minimum='0.0.0', name='version ', pinned=Fals
     if hard:
         assert result, emojis(s)  # assert min requirements met
     if verbose and not result:
-        logger.warning(s)
+        LOGGER.warning(s)
     return result
 
 def get_latest_run(search_dir='.'):
@@ -123,7 +123,26 @@ def check_git_status():
     except Exception as e:
         print(e)
 
+def set_logging(name=None, verbose=VERBOSE):
+    # Sets level and returns logger
+    if  is_colab():
+        for h in logging.root.handlers:
+            logging.root.removeHandler(h)  # remove all handlers associated with the root logger object
+    rank = int(os.getenv('RANK', -1))  # rank in world for Multi-GPU trainings
+    level = logging.INFO if verbose and rank in {-1, 0} else logging.ERROR
+    log = logging.getLogger(name)
+    log.setLevel(level)
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    handler.setLevel(level)
+    log.addHandler(handler)
 
+
+set_logging()  # run before defining LOGGER
+LOGGER = logging.getLogger("yolov5")  # define globally (used in train.py, val.py, detect.py, etc.)
+if platform.system() == 'Windows':
+    for fn in LOGGER.info, LOGGER.warning:
+        setattr(LOGGER, fn.__name__, lambda x: fn(emojis(x)))  # emoji safe logging
         
 def check_requirements(requirements='requirements.txt', exclude=()):
     # Check installed dependencies meet requirements (pass *.txt file or list of packages)
@@ -188,7 +207,7 @@ def print_args(args: Optional[dict] = None, show_file=True, show_func=False):
     except ValueError:
         file = Path(file).stem
     s = (f'{file}: ' if show_file else '') + (f'{func}: ' if show_func else '')
-    logger.info(colorstr(s) + ', '.join(f'{k}={v}' for k, v in args.items()))
+    LOGGER.info(colorstr(s) + ', '.join(f'{k}={v}' for k, v in args.items()))
 
 def check_file(file):
     # Search for file if not found
