@@ -119,7 +119,9 @@ def set_logging(name=None, verbose=VERBOSE):
 
 set_logging()  # run before defining LOGGER
 LOGGER = logging.getLogger("yolov5")  # define globally (used in train.py, val.py, detect.py, etc.)
-
+if platform.system() == 'Windows':
+    for fn in LOGGER.info, LOGGER.warning:
+        setattr(LOGGER, fn.__name__, lambda x: fn(emojis(x)))  # emoji safe logging
 
 
 def user_config_dir(dir='Ultralytics', env_var='YOLOV5_CONFIG_DIR'):
@@ -321,10 +323,19 @@ def check_python(minimum='3.7.0'):
     check_version(platform.python_version(), minimum, name='Python ', hard=True)
 
 
+def check_version(current='0.0.0', minimum='0.0.0', name='version ', pinned=False, hard=False, verbose=False):
+    # Check version vs. required version
+    current, minimum = (pkg.parse_version(x) for x in (current, minimum))
+    result = (current == minimum) if pinned else (current >= minimum)  # bool
+    s = f'WARNING ⚠️ {name}{minimum} is required by YOLOv5, but {name}{current} is currently installed'  # string
+    if hard:
+        assert result, emojis(s)  # assert min requirements met
+    if verbose and not result:
+        LOGGER.warning(s)
+    return result
 
 
-
-
+@TryExcept()
 def check_requirements(requirements=ROOT / 'requirements.txt', exclude=(), install=True, cmds=''):
     # Check installed dependencies meet YOLOv5 requirements (pass *.txt file or list of packages or single package str)
     prefix = colorstr('red', 'bold', 'requirements:')
