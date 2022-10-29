@@ -7,20 +7,19 @@ import os
 import platform
 import random
 import re
-import inspect
 import subprocess
 import time
 from itertools import repeat
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
-from typing import Optional
+
 import cv2
 import numpy as np
 import pandas as pd
 import torch
 import torchvision
 import yaml
-import pkg_resources as pkg
+
 from utils.google_utils import gsutil_getsize
 from utils.metrics import fitness
 from utils.torch_utils import init_torch_seeds
@@ -44,21 +43,7 @@ def init_seeds(seed=0):
     random.seed(seed)
     np.random.seed(seed)
     init_torch_seeds(seed)
-def check_python(minimum='3.7.0'):
-    # Check current python version vs. required python version
-    check_version(platform.python_version(), minimum, name='Python ', hard=True)
 
-
-def check_version(current='0.0.0', minimum='0.0.0', name='version ', pinned=False, hard=False, verbose=False):
-    # Check version vs. required version
-    current, minimum = (pkg.parse_version(x) for x in (current, minimum))
-    result = (current == minimum) if pinned else (current >= minimum)  # bool
-    s = f'WARNING ⚠️ {name}{minimum} is required by YOLOv5, but {name}{current} is currently installed'  # string
-    if hard:
-        assert result, emojis(s)  # assert min requirements met
-    if verbose and not result:
-        LOGGER.warning(s)
-    return result
 
 def get_latest_run(search_dir='.'):
     # Return path to most recent 'last.pt' in /runs (i.e. to --resume from)
@@ -195,19 +180,6 @@ def check_imshow():
         print(f'WARNING: Environment does not support cv2.imshow() or PIL Image.show() image displays\n{e}')
         return False
 
-def print_args(args: Optional[dict] = None, show_file=True, show_func=False):
-    # Print function arguments (optional args dict)
-    x = inspect.currentframe().f_back  # previous frame
-    file, _, func, _, _ = inspect.getframeinfo(x)
-    if args is None:  # get args automatically
-        args, _, _, frm = inspect.getargvalues(x)
-        args = {k: v for k, v in frm.items() if k in args}
-    try:
-        file = Path(file).resolve().relative_to(ROOT).with_suffix('')
-    except ValueError:
-        file = Path(file).stem
-    s = (f'{file}: ' if show_file else '') + (f'{func}: ' if show_func else '')
-    LOGGER.info(colorstr(s) + ', '.join(f'{k}={v}' for k, v in args.items()))
 
 def check_file(file):
     # Search for file if not found

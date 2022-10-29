@@ -20,7 +20,7 @@ import pandas as pd
 import torch
 import torchvision
 import yaml
-import pkg_resources as pkg
+
 from utils.google_utils import gsutil_getsize
 from utils.metrics import fitness
 from utils.torch_utils import init_torch_seeds
@@ -44,21 +44,7 @@ def init_seeds(seed=0):
     random.seed(seed)
     np.random.seed(seed)
     init_torch_seeds(seed)
-def check_python(minimum='3.7.0'):
-    # Check current python version vs. required python version
-    check_version(platform.python_version(), minimum, name='Python ', hard=True)
 
-
-def check_version(current='0.0.0', minimum='0.0.0', name='version ', pinned=False, hard=False, verbose=False):
-    # Check version vs. required version
-    current, minimum = (pkg.parse_version(x) for x in (current, minimum))
-    result = (current == minimum) if pinned else (current >= minimum)  # bool
-    s = f'WARNING ⚠️ {name}{minimum} is required by YOLOv5, but {name}{current} is currently installed'  # string
-    if hard:
-        assert result, emojis(s)  # assert min requirements met
-    if verbose and not result:
-        LOGGER.warning(s)
-    return result
 
 def get_latest_run(search_dir='.'):
     # Return path to most recent 'last.pt' in /runs (i.e. to --resume from)
