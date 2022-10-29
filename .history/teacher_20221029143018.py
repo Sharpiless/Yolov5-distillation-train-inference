@@ -3,8 +3,7 @@ from utils.general import non_max_suppression, scale_coords, xyxy2xywh
 import numpy as np
 import torch
 from utils.torch_utils import select_device
-import warnings
-warnings.simplefilter("ignore")
+
 class TeacherModel(object):
     def __init__(self, conf_thres=0.5, iou_thres=0.3, imgsz=640, training=False):
         self.model = None
