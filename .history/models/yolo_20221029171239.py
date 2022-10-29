@@ -147,7 +147,7 @@ class BaseModel(nn.Module):
                 delattr(m, 'bn')  # remove batchnorm
                 m.forward = m.fuseforward  # update forward
         self.info()
-        return  self
+        return 
 
     def info(self, verbose=False, img_size=640):  # print model information
         model_info(self, verbose, img_size)
