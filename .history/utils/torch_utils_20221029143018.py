@@ -92,11 +92,6 @@ def time_synchronized():
         torch.cuda.synchronize()
     return time.time()
 
-def time_sync():
-    # PyTorch-accurate time
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-    return time.time()
 
 def profile(x, ops, n=100, device=None):
     # profile a pytorch module or list of modules. Example usage:
