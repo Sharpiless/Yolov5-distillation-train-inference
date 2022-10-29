@@ -35,6 +35,7 @@ import torchvision
 import yaml
 
 from utils.downloads import gsutil_getsize
+from utils.metrics import box_iou, fitness
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLOv5 root directory
